@@ -64,7 +64,7 @@ static constexpr EventData s_dataForEvent[4*Event::PageSize] = {
   U(), U(), U(), U(), U(), U(),
   U(), U(), U(), U(), U(), U(),
   U(), U(), U(), U(), U(), U(),
-  U(), U(), U(), U(), U(), U(),
+  U(), U(), TL(), U(), U(), U(),
 // Alpha
   U(), U(), U(), U(), U(), U(),
   U(), U(), U(), U(), U(), U(),
@@ -164,7 +164,7 @@ static constexpr const char * s_nameForEvent[255] = {
   nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
   nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
   nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-  nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+  nullptr, nullptr, "AngleToggle", nullptr, nullptr, nullptr,
   //Alpha,
   nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
   nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,

@@ -1,7 +1,10 @@
 #include <escher/responder.h>
+#include <apps/apps_container.h>
+#include <apps/i18n.h>
 #include <escher/app.h>
 #include <escher/toolbox.h>
 #include <escher/metric.h>
+#include <poincare.h>
 #include <assert.h>
 
 Responder::Responder(Responder * parentResponder) :
@@ -21,6 +24,17 @@ bool Responder::handleEvent(Ion::Events::Event event) {
   if (event == Ion::Events::Toolbox && toolbox() != nullptr) {
     toolbox()->setSender(this);
     app()->displayModalViewController(toolbox(), 0.f, 0.f, Metric::PopUpTopMargin, Metric::PopUpLeftMargin, 0, Metric::PopUpRightMargin);
+    return true;
+  }
+  if (event == Ion::Events::AngleToggle) {
+    if (Poincare::Preferences::sharedPreferences()->angleUnit() == Poincare::Expression::AngleUnit::Radian) {
+      Poincare::Preferences::sharedPreferences()->setAngleUnit(Poincare::Expression::AngleUnit::Degree);
+      app()->displayWarning(I18n::Message::Degres);
+    } else {
+      Poincare::Preferences::sharedPreferences()->setAngleUnit(Poincare::Expression::AngleUnit::Radian);
+      app()->displayWarning(I18n::Message::Radian);
+    }
+    ((AppsContainer * )app()->container())->refreshPreferences();
     return true;
   }
   return false;

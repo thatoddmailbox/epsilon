@@ -138,6 +138,8 @@ constexpr Event Equal = Event::ShiftKey(Keyboard::Key::E4);
 constexpr Event Lower = Event::ShiftKey(Keyboard::Key::E5);
 constexpr Event Greater = Event::ShiftKey(Keyboard::Key::E6);
 
+constexpr Event AngleToggle = Event::ShiftKey(Keyboard::Key::I3);
+
 // Alpha
 
 constexpr Event Colon = Event::AlphaKey(Keyboard::Key::C3);
