@@ -1,43 +1,24 @@
 #include <poincare/hyperbolic_cosine.h>
-#include <poincare/addition.h>
-#include <poincare/power.h>
-#include <poincare/division.h>
-#include <poincare/opposite.h>
-#include <poincare/simplification_engine.h>
-#include <poincare/trigonometry.h>
-extern "C" {
-#include <assert.h>
-}
-#include <cmath>
+#include <poincare/layout_helper.h>
+#include <poincare/serialization_helper.h>
 
 namespace Poincare {
 
-Expression::Type HyperbolicCosine::type() const {
-  return Type::HyperbolicCosine;
-}
+constexpr Expression::FunctionHelper HyperbolicCosine::s_functionHelper;
 
-Expression * HyperbolicCosine::clone() const {
-  HyperbolicCosine * a = new HyperbolicCosine(m_operands, true);
-  return a;
+Layout HyperbolicCosineNode::createLayout(Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const {
+  return LayoutHelper::Prefix(HyperbolicCosine(this), floatDisplayMode, numberOfSignificantDigits, HyperbolicCosine::s_functionHelper.name());
 }
-
-Expression * HyperbolicCosine::shallowReduce(Context& context, AngleUnit angleUnit) {
-  Expression * e = Expression::shallowReduce(context, angleUnit);
-  if (e != this) {
-    return e;
-  }
-#if MATRIX_EXACT_REDUCING
-  Expression * op = editableOperand(0);
-  if (op->type() == Type::Matrix) {
-    return SimplificationEngine::map(this, context, angleUnit);
-  }
-#endif
-  return this;
+int HyperbolicCosineNode::serialize(char * buffer, int bufferSize, Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const {
+  return SerializationHelper::Prefix(this, buffer, bufferSize, floatDisplayMode, numberOfSignificantDigits, HyperbolicCosine::s_functionHelper.name());
 }
 
 template<typename T>
-std::complex<T> HyperbolicCosine::computeOnComplex(const std::complex<T> c, AngleUnit angleUnit) {
-  return Trigonometry::RoundToMeaningfulDigits(std::cosh(c));
+Complex<T> HyperbolicCosineNode::computeOnComplex(const std::complex<T> c, Preferences::AngleUnit angleUnit) {
+  return Complex<T>(Trigonometry::RoundToMeaningfulDigits(std::cosh(c), c));
 }
+
+template Complex<float> Poincare::HyperbolicCosineNode::computeOnComplex<float>(std::complex<float>, Preferences::AngleUnit);
+template Complex<double> Poincare::HyperbolicCosineNode::computeOnComplex<double>(std::complex<double>, Preferences::AngleUnit);
 
 }

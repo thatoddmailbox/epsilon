@@ -2,54 +2,60 @@
 #include "../../shared/poincare_helpers.h"
 #include <math.h>
 #include <assert.h>
-#include "../../poincare/include/poincare_layouts.h"
+#include <poincare/char_layout.h>
+#include <poincare/horizontal_layout.h>
+#include <poincare/vertical_offset_layout.h>
+#include <poincare/decimal.h>
+#include <poincare/number.h>
+#include <poincare/symbol.h>
+#include <poincare/addition.h>
+#include <poincare/multiplication.h>
+#include <poincare/power.h>
 
 using namespace Poincare;
 using namespace Shared;
 
 namespace Regression {
 
-ExpressionLayout * QuadraticModel::layout() {
-  static ExpressionLayout * layout = nullptr;
-  if (layout == nullptr) {
-    const ExpressionLayout * layoutChildren[] = {
-      new CharLayout('a', KDText::FontSize::Small),
-      new CharLayout(Ion::Charset::MiddleDot, KDText::FontSize::Small),
-      new CharLayout('X', KDText::FontSize::Small),
-      new VerticalOffsetLayout(
-          new CharLayout('2', KDText::FontSize::Small),
-          VerticalOffsetLayout::Type::Superscript,
-          false),
-      new CharLayout('+', KDText::FontSize::Small),
-      new CharLayout('b', KDText::FontSize::Small),
-      new CharLayout(Ion::Charset::MiddleDot, KDText::FontSize::Small),
-      new CharLayout('X', KDText::FontSize::Small),
-      new CharLayout('+', KDText::FontSize::Small),
-      new CharLayout('c', KDText::FontSize::Small),
+Layout QuadraticModel::layout() {
+  if (m_layout.isUninitialized()) {
+    const Layout layoutChildren[] = {
+      CharLayout('a', KDFont::SmallFont),
+      CharLayout(Ion::Charset::MiddleDot, KDFont::SmallFont),
+      CharLayout('X', KDFont::SmallFont),
+      VerticalOffsetLayout(
+          CharLayout('2', KDFont::SmallFont),
+          VerticalOffsetLayoutNode::Type::Superscript
+        ),
+      CharLayout('+', KDFont::SmallFont),
+      CharLayout('b', KDFont::SmallFont),
+      CharLayout(Ion::Charset::MiddleDot, KDFont::SmallFont),
+      CharLayout('X', KDFont::SmallFont),
+      CharLayout('+', KDFont::SmallFont),
+      CharLayout('c', KDFont::SmallFont),
     };
-    layout = new HorizontalLayout(layoutChildren, 10, false);
+    m_layout = HorizontalLayout(layoutChildren, 10);
   }
-  return layout;
+  return m_layout;
 }
 
-Expression * QuadraticModel::simplifiedExpression(double * modelCoefficients, Poincare::Context * context) {
+Expression QuadraticModel::simplifiedExpression(double * modelCoefficients, Poincare::Context * context) {
   double a = modelCoefficients[0];
   double b = modelCoefficients[1];
   double c = modelCoefficients[2];
-  Expression * ax2Expression = new Multiplication(
-      new Decimal(a),
-      new Power(
-        new Symbol('x'),
-        new Decimal(2.0),
-        false),
-      false);
-  Expression * bxExpression = new Multiplication(
-    new Decimal(b),
-    new Symbol('x'),
-    false);
-  Expression * cExpression = new Decimal(c);
-  Expression * const operands[] = {ax2Expression, bxExpression, cExpression};
-  Expression * result = new Addition(operands, 3, false);
+  // a*x^2+b*x+c
+  Expression addChildren[] = {
+    Multiplication(
+      Number::DecimalNumber(a),
+      Power(
+        Symbol('x'),
+        Decimal(2.0))),
+    Multiplication(
+      Number::DecimalNumber(b),
+      Symbol('x')),
+    Number::DecimalNumber(c)
+  };
+  Expression result = Addition(addChildren, 3);
   PoincareHelpers::Simplify(&result, *context);
   return result;
 }

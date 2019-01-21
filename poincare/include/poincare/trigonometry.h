@@ -6,23 +6,23 @@
 
 namespace Poincare {
 
-class Trigonometry  {
+class Trigonometry final {
 public:
   enum class Function {
     Cosine = 0,
     Sine = 1,
   };
-  static float characteristicXRange(const Expression * e, Context & context, Expression::AngleUnit angleUnit);
-  static Expression * shallowReduceDirectFunction(Expression * e, Context& context, Expression::AngleUnit angleUnit);
-  static Expression * shallowReduceInverseFunction(Expression * e, Context& context, Expression::AngleUnit angleUnit);
-  static bool ExpressionIsEquivalentToTangent(const Expression * e);
+  static float characteristicXRange(const Expression & e, Context & context, Preferences::AngleUnit angleUnit);
+  static Expression shallowReduceDirectFunction(Expression & e, Context& context, Preferences::AngleUnit angleUnit);
+  static Expression shallowReduceInverseFunction(Expression & e, Context& context, Preferences::AngleUnit angleUnit);
+  static bool ExpressionIsEquivalentToTangent(const Expression & e);
   constexpr static int k_numberOfEntries = 37;
-  static Expression * table(const Expression * e, Expression::Type type, Context & context, Expression::AngleUnit angleUnit); // , Function f, bool inverse
-  template <typename T> static std::complex<T> ConvertToRadian(const std::complex<T> c, Expression::AngleUnit angleUnit);
-  template <typename T> static std::complex<T> ConvertRadianToAngleUnit(const std::complex<T> c, Expression::AngleUnit angleUnit);
-  template <typename T> static std::complex<T> RoundToMeaningfulDigits(const std::complex<T> c);
+  static Expression table(const Expression e, ExpressionNode::Type type, Context & context, Preferences::AngleUnit angleUnit); // , Function f, bool inverse
+  template <typename T> static std::complex<T> ConvertToRadian(const std::complex<T> c, Preferences::AngleUnit angleUnit);
+  template <typename T> static std::complex<T> ConvertRadianToAngleUnit(const std::complex<T> c, Preferences::AngleUnit angleUnit);
+  template <typename T> static std::complex<T> RoundToMeaningfulDigits(const std::complex<T> result, const std::complex<T> input);
 private:
-  template <typename T> static T RoundToMeaningfulDigits(T f);
+  template <typename T> static T RoundToMeaningfulDigits(T result, T input);
 };
 
 }

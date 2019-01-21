@@ -1,30 +1,30 @@
 #include "logarithmic_model.h"
 #include "../store.h"
-#include "../../poincare/include/poincare_layouts.h"
 #include <math.h>
 #include <assert.h>
+#include <poincare/char_layout.h>
+#include <poincare/horizontal_layout.h>
 
 using namespace Poincare;
 
 namespace Regression {
 
-ExpressionLayout * LogarithmicModel::layout() {
-  static ExpressionLayout * layout = nullptr;
-  if (layout == nullptr) {
-    const ExpressionLayout * layoutChildren[] = {
-      new CharLayout('a', KDText::FontSize::Small),
-      new CharLayout(Ion::Charset::MiddleDot, KDText::FontSize::Small),
-      new CharLayout('l', KDText::FontSize::Small),
-      new CharLayout('n', KDText::FontSize::Small),
-      new CharLayout('(', KDText::FontSize::Small),
-      new CharLayout('X', KDText::FontSize::Small),
-      new CharLayout(')', KDText::FontSize::Small),
-      new CharLayout('+', KDText::FontSize::Small),
-      new CharLayout('b', KDText::FontSize::Small)
+Layout LogarithmicModel::layout() {
+  if (m_layout.isUninitialized()) {
+    const Layout layoutChildren[] = {
+      CharLayout('a', KDFont::SmallFont),
+      CharLayout(Ion::Charset::MiddleDot, KDFont::SmallFont),
+      CharLayout('l', KDFont::SmallFont),
+      CharLayout('n', KDFont::SmallFont),
+      CharLayout('(', KDFont::SmallFont),
+      CharLayout('X', KDFont::SmallFont),
+      CharLayout(')', KDFont::SmallFont),
+      CharLayout('+', KDFont::SmallFont),
+      CharLayout('b', KDFont::SmallFont)
     };
-    layout = new HorizontalLayout(layoutChildren, 9, false);
+    m_layout = HorizontalLayout(layoutChildren, 9);
   }
-  return layout;
+  return m_layout;
 }
 
 double LogarithmicModel::evaluate(double * modelCoefficients, double x) const {

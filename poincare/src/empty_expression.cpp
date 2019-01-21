@@ -1,28 +1,23 @@
 #include <poincare/empty_expression.h>
-#include <poincare/layout_engine.h>
-#include <poincare/src/layout/empty_layout.h>
+#include <poincare/complex.h>
+#include <poincare/empty_layout.h>
+#include <poincare/serialization_helper.h>
 #include <ion/charset.h>
-
-extern "C" {
-#include <math.h>
-}
 
 namespace Poincare {
 
-Expression * EmptyExpression::clone() const {
-  return new EmptyExpression();
+int EmptyExpressionNode::serialize(char * buffer, int bufferSize, Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const {
+  return SerializationHelper::Char(buffer, bufferSize, Ion::Charset::Empty);
 }
 
-int EmptyExpression::writeTextInBuffer(char * buffer, int bufferSize, PrintFloat::Mode floatDisplayMode, int numberOfSignificantDigits) const {
-  return LayoutEngine::writeOneCharInBuffer(buffer, bufferSize, Ion::Charset::Empty);
+Layout EmptyExpressionNode::createLayout(Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const {
+  return EmptyLayout();
 }
 
-ExpressionLayout * EmptyExpression::createLayout(PrintFloat::Mode floatDisplayMode, int numberOfSignificantDigits) const {
-  return new EmptyLayout();
+template<typename T> Evaluation<T> EmptyExpressionNode::templatedApproximate(Context& context, Preferences::AngleUnit angleUnit) const {
+  return Complex<T>::Undefined();
 }
 
-template<typename T> Complex<T> * EmptyExpression::templatedApproximate(Context& context, AngleUnit angleUnit) const {
-  return new Complex<T>(Complex<T>::Undefined());
-}
+EmptyExpression::EmptyExpression() : Expression(TreePool::sharedPool()->createTreeNode<EmptyExpressionNode>()) {}
 
 }

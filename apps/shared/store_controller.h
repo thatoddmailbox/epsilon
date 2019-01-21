@@ -14,12 +14,13 @@ namespace Shared {
 
 class StoreController : public EditableCellTableViewController, public ButtonRowDelegate  {
 public:
-  StoreController(Responder * parentResponder, DoublePairStore * store, ButtonRowController * header);
+  StoreController(Responder * parentResponder, InputEventHandlerDelegate * inputEventHandlerDelegate, DoublePairStore * store, ButtonRowController * header);
+  View * view() override { return &m_contentView; }
 
   virtual StoreContext * storeContext() = 0;
   void displayFormulaInput();
   virtual void setFormulaLabel() = 0;
-  virtual bool fillColumnWithFormula(Poincare::Expression * formula) = 0;
+  virtual bool fillColumnWithFormula(Poincare::Expression formula) = 0;
 
   // TextFieldDelegate
   bool textFieldShouldFinishEditing(TextField * textField, Ion::Events::Event event) override;
@@ -47,14 +48,14 @@ protected:
   static constexpr KDCoordinate k_cellWidth = 116;
   static constexpr KDCoordinate k_margin = 8;
   static constexpr KDCoordinate k_scrollBarMargin = Metric::CommonRightMargin;
-  constexpr static int k_maxNumberOfEditableCells = 22 * DoublePairStore::k_numberOfSeries;
+  constexpr static int k_maxNumberOfEditableCells = (Ion::Display::Width/k_cellWidth+2) * ((Ion::Display::Height - Metric::TitleBarHeight - Metric::TabHeight)/k_cellHeight+2);
   constexpr static int k_numberOfTitleCells = 4;
   static constexpr int k_titleCellType = 0;
   static constexpr int k_editableCellType = 1;
 
   class ContentView : public View , public Responder {
   public:
-    ContentView(DoublePairStore * store, Responder * parentResponder, TableViewDataSource * dataSource, SelectableTableViewDataSource * selectionDataSource, TextFieldDelegate * textFieldDelegate);
+    ContentView(DoublePairStore * store, Responder * parentResponder, TableViewDataSource * dataSource, SelectableTableViewDataSource * selectionDataSource, InputEventHandlerDelegate * inputEventHandlerDelegate, TextFieldDelegate * textFieldDelegate);
    StoreSelectableTableView * dataView() { return &m_dataView; }
    BufferTextViewWithTextField * formulaInputView() { return &m_formulaInputView; }
    void displayFormulaInput(bool display);
@@ -75,8 +76,6 @@ protected:
 
   Responder * tabController() const override;
   SelectableTableView * selectableTableView() override;
-  View * loadView() override;
-  void unloadView(View * view) override;
   bool cellAtLocationIsEditable(int columnIndex, int rowIndex) override;
   bool setDataAtLocation(double floatBody, int columnIndex, int rowIndex) override;
   double dataAtLocation(int columnIndex, int rowIndex) override;
@@ -85,13 +84,13 @@ protected:
   virtual HighlightCell * titleCells(int index) = 0;
   char m_draftTextBuffer[TextField::maxBufferSize()];
   int seriesAtColumn(int column) const { return column / DoublePairStore::k_numberOfColumnsPerSeries; }
-  bool privateFillColumnWithFormula(Poincare::Expression * formula, Poincare::Expression::isVariableTest isVariable);
+  bool privateFillColumnWithFormula(Poincare::Expression formula, Poincare::ExpressionNode::isVariableTest isVariable);
   virtual StoreParameterController * storeParameterController() = 0;
-  StoreCell * m_editableCells[k_maxNumberOfEditableCells];
+  StoreCell m_editableCells[k_maxNumberOfEditableCells];
   DoublePairStore * m_store;
 private:
   bool cellShouldBeTransparent(int i, int j);
-  ContentView * contentView() { return static_cast<ContentView *>(view()); }
+  ContentView m_contentView;
 };
 
 }

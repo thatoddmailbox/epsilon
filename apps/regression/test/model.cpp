@@ -27,10 +27,10 @@ void assert_regression_is(double * xi, double * yi, int numberOfPoints, Model::T
   // Compute the coefficients
   double * coefficients = store.coefficientsForSeries(series, &context);
 
-  // Comapre the coefficients
+  // Compare the coefficients
   int numberOfCoefs = store.modelForSeries(series)->numberOfCoefficients();
   for (int i = 0; i < numberOfCoefs; i++) {
-    assert(std::fabs(coefficients[i] - trueCoefficients[i]) < precision);
+    quiz_assert(std::fabs(coefficients[i] - trueCoefficients[i]) < precision);
   }
 }
 

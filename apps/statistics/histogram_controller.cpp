@@ -14,14 +14,14 @@ namespace Statistics {
 static inline float min(float x, float y) { return (x<y ? x : y); }
 static inline float max(float x, float y) { return (x>y ? x : y); }
 
-HistogramController::HistogramController(Responder * parentResponder, ButtonRowController * header, Store * store, uint32_t * storeVersion, uint32_t * barVersion, uint32_t * rangeVersion, int * selectedBarIndex, int * selectedSeriesIndex) :
+HistogramController::HistogramController(Responder * parentResponder, InputEventHandlerDelegate * inputEventHandlerDelegate, ButtonRowController * header, Store * store, uint32_t * storeVersion, uint32_t * barVersion, uint32_t * rangeVersion, int * selectedBarIndex, int * selectedSeriesIndex) :
   MultipleDataViewController(parentResponder, store, selectedBarIndex, selectedSeriesIndex),
   ButtonRowDelegate(header, nullptr),
   m_view(this, store),
   m_storeVersion(storeVersion),
   m_barVersion(barVersion),
   m_rangeVersion(rangeVersion),
-  m_histogramParameterController(nullptr, store)
+  m_histogramParameterController(nullptr, inputEventHandlerDelegate, store)
 {
 }
 
@@ -47,9 +47,8 @@ bool HistogramController::handleEvent(Ion::Events::Event event) {
   return MultipleDataViewController::handleEvent(event);
 }
 
-void HistogramController::didBecomeFirstResponder() {
-  MultipleDataViewController::didBecomeFirstResponder();
-
+void HistogramController::viewWillAppear() {
+  MultipleDataViewController::viewWillAppear();
   uint32_t storeChecksum = m_store->storeChecksum();
   if (*m_storeVersion != storeChecksum) {
     *m_storeVersion = storeChecksum;
@@ -67,8 +66,6 @@ void HistogramController::didBecomeFirstResponder() {
     initBarSelection();
     reloadBannerView();
   }
-  HistogramView * selectedHistogramView = static_cast<HistogramView *>(m_view.dataViewAtIndex(selectedSeriesIndex()));
-  selectedHistogramView->setHighlight(m_store->startOfBarAtIndex(selectedSeriesIndex(), *m_selectedBarIndex), m_store->endOfBarAtIndex(selectedSeriesIndex(), *m_selectedBarIndex));
 }
 
 void HistogramController::willExitResponderChain(Responder * nextFirstResponder) {
@@ -80,6 +77,15 @@ void HistogramController::willExitResponderChain(Responder * nextFirstResponder)
   MultipleDataViewController::willExitResponderChain(nextFirstResponder);
 }
 
+void HistogramController::highlightSelection() {
+  HistogramView * selectedHistogramView = static_cast<HistogramView *>(m_view.dataViewAtIndex(selectedSeriesIndex()));
+  selectedHistogramView->setHighlight(m_store->startOfBarAtIndex(selectedSeriesIndex(), *m_selectedBarIndex), m_store->endOfBarAtIndex(selectedSeriesIndex(), *m_selectedBarIndex));
+  // if the selectedBar was outside of range, we need to scroll
+  if (m_store->scrollToSelectedBarIndex(selectedSeriesIndex(), *m_selectedBarIndex)) {
+    multipleDataView()->reload();
+  }
+}
+
 Responder * HistogramController::tabController() const {
   return (parentResponder()->parentResponder()->parentResponder()->parentResponder());
 }
@@ -88,13 +94,14 @@ void HistogramController::reloadBannerView() {
   if (selectedSeriesIndex() < 0) {
     return;
   }
-  char buffer[k_maxNumberOfCharacters+ PrintFloat::bufferSizeForFloatsWithPrecision(Constant::LargeNumberOfSignificantDigits)*2];
+  const size_t bufferSize = k_maxNumberOfCharacters+ PrintFloat::bufferSizeForFloatsWithPrecision(Constant::LargeNumberOfSignificantDigits)*2;
+  char buffer[bufferSize];
   int numberOfChar = 0;
 
   // Add Interval Data
   const char * legend = " [";
   int legendLength = strlen(legend);
-  strlcpy(buffer, legend, legendLength+1);
+  strlcpy(buffer, legend, bufferSize);
   numberOfChar += legendLength;
 
   // Add lower bound
@@ -123,7 +130,7 @@ void HistogramController::reloadBannerView() {
   numberOfChar = 0;
   legend = ": ";
   legendLength = strlen(legend);
-  strlcpy(buffer, legend, legendLength+1);
+  strlcpy(buffer, legend, bufferSize);
   numberOfChar += legendLength;
   double size = 0;
   if (selectedSeriesIndex() >= 0) {
@@ -141,7 +148,7 @@ void HistogramController::reloadBannerView() {
   numberOfChar = 0;
   legend = ": ";
   legendLength = strlen(legend);
-  strlcpy(buffer, legend, legendLength+1);
+  strlcpy(buffer, legend, bufferSize);
   numberOfChar += legendLength;
   if (selectedSeriesIndex() >= 0) {
     double frequency = size/m_store->sumOfOccurrences(selectedSeriesIndex());

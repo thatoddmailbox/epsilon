@@ -1,49 +1,53 @@
 #include <poincare/cosine.h>
-#include <poincare/hyperbolic_cosine.h>
-#include <poincare/symbol.h>
-#include <poincare/rational.h>
-#include <poincare/multiplication.h>
-#include <poincare/simplification_engine.h>
-#include <ion.h>
-extern "C" {
-#include <assert.h>
-}
+#include <poincare/complex.h>
+#include <poincare/layout_helper.h>
+#include <poincare/serialization_helper.h>
+#include <poincare/simplification_helper.h>
 #include <cmath>
 
 namespace Poincare {
 
-Expression::Type Cosine::type() const {
-  return Type::Cosine;
-}
+constexpr Expression::FunctionHelper Cosine::s_functionHelper;
 
-Expression * Cosine::clone() const {
-  Cosine * a = new Cosine(m_operands, true);
-  return a;
-}
+int CosineNode::numberOfChildren() const { return Cosine::s_functionHelper.numberOfChildren(); }
 
-float Cosine::characteristicXRange(Context & context, AngleUnit angleUnit) const {
-  return Trigonometry::characteristicXRange(this, context, angleUnit);
+float CosineNode::characteristicXRange(Context & context, Preferences::AngleUnit angleUnit) const {
+  return Trigonometry::characteristicXRange(Cosine(this), context, angleUnit);
 }
 
 template<typename T>
-std::complex<T> Cosine::computeOnComplex(const std::complex<T> c, AngleUnit angleUnit) {
+Complex<T> CosineNode::computeOnComplex(const std::complex<T> c, Preferences::AngleUnit angleUnit) {
   std::complex<T> angleInput = Trigonometry::ConvertToRadian(c, angleUnit);
   std::complex<T> res = std::cos(angleInput);
-  return Trigonometry::RoundToMeaningfulDigits(res);
+  return Complex<T>(Trigonometry::RoundToMeaningfulDigits(res, angleInput));
 }
 
-Expression * Cosine::shallowReduce(Context& context, AngleUnit angleUnit) {
-  Expression * e = Expression::shallowReduce(context, angleUnit);
-  if (e != this) {
-    return e;
+Layout CosineNode::createLayout(Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const {
+  return LayoutHelper::Prefix(Cosine(this), floatDisplayMode, numberOfSignificantDigits, Cosine::s_functionHelper.name());
+}
+
+int CosineNode::serialize(char * buffer, int bufferSize, Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const {
+  return SerializationHelper::Prefix(this, buffer, bufferSize, floatDisplayMode, numberOfSignificantDigits, Cosine::s_functionHelper.name());
+}
+
+Expression CosineNode::shallowReduce(Context & context, Preferences::AngleUnit angleUnit, bool replaceSymbols) {
+  return Cosine(this).shallowReduce(context, angleUnit, replaceSymbols);
+}
+
+Expression Cosine::shallowReduce(Context & context, Preferences::AngleUnit angleUnit, bool replaceSymbols) {
+  {
+    Expression e = Expression::defaultShallowReduce(context, angleUnit);
+    if (e.isUndefined()) {
+      return e;
+    }
   }
 #if MATRIX_EXACT_REDUCING
-  Expression * op = editableOperand(0);
-  if (op->type() == Type::Matrix) {
-    return SimplificationEngine::map(this, context, angleUnit);
+  Expression op = childAtIndex(0);
+  if (op.type() == ExpressionNode::Type::Matrix) {
+    return SimplificationHelper::Map(*this, context, angleUnit);
   }
 #endif
-  return Trigonometry::shallowReduceDirectFunction(this, context, angleUnit);
+  return Trigonometry::shallowReduceDirectFunction(*this, context, angleUnit);
 }
 
 }

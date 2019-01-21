@@ -1,32 +1,27 @@
 #include <escher/input_view_controller.h>
 #include <escher/app.h>
 #include <escher/palette.h>
-#include <poincare/src/layout/horizontal_layout.h>
 #include <assert.h>
 
-InputViewController::ExpressionFieldController::ExpressionFieldController(Responder * parentResponder, TextFieldDelegate * textFieldDelegate, ExpressionLayoutFieldDelegate * expressionLayoutFieldDelegate) :
+InputViewController::ExpressionFieldController::ExpressionFieldController(Responder * parentResponder, InputEventHandlerDelegate * inputEventHandlerDelegate, TextFieldDelegate * textFieldDelegate, LayoutFieldDelegate * layoutFieldDelegate) :
   ViewController(parentResponder),
-  m_layout(new Poincare::HorizontalLayout()),
-  m_expressionField(this, m_textBuffer, k_bufferLength, m_layout, textFieldDelegate, expressionLayoutFieldDelegate)
+  m_expressionField(this, m_textBuffer, k_bufferLength, inputEventHandlerDelegate, textFieldDelegate, layoutFieldDelegate)
 {
   m_textBuffer[0] = 0;
-}
-
-InputViewController::ExpressionFieldController::~ExpressionFieldController() {
-  delete m_layout;
 }
 
 void InputViewController::ExpressionFieldController::didBecomeFirstResponder() {
   app()->setFirstResponder(&m_expressionField);
 }
 
-InputViewController::InputViewController(Responder * parentResponder, ViewController * child, TextFieldDelegate * textFieldDelegate, ExpressionLayoutFieldDelegate * expressionLayoutFieldDelegate) :
+InputViewController::InputViewController(Responder * parentResponder, ViewController * child, InputEventHandlerDelegate * inputEventHandlerDelegate, TextFieldDelegate * textFieldDelegate, LayoutFieldDelegate * layoutFieldDelegate) :
   ModalViewController(parentResponder, child),
-  m_expressionFieldController(this, this, this),
+  m_expressionFieldController(this, this, this, this),
   m_successAction(Invocation(nullptr, nullptr)),
   m_failureAction(Invocation(nullptr, nullptr)),
+  m_inputEventHandlerDelegate(inputEventHandlerDelegate),
   m_textFieldDelegate(textFieldDelegate),
-  m_expressionLayoutFieldDelegate(expressionLayoutFieldDelegate),
+  m_layoutFieldDelegate(layoutFieldDelegate),
   m_inputViewHeightIsMaximal(false)
 {
 }
@@ -55,9 +50,11 @@ bool InputViewController::textFieldShouldFinishEditing(TextField * textField, Io
 }
 
 bool InputViewController::textFieldDidFinishEditing(TextField * textField, const char * text, Ion::Events::Event event) {
-  inputViewDidFinishEditing();
-  m_textFieldDelegate->textFieldDidFinishEditing(textField, text, event);
-  return true;
+  if (inputViewDidFinishEditing()) {
+    m_textFieldDelegate->textFieldDidFinishEditing(textField, text, event);
+    return true;
+  }
+  return false;
 }
 
 bool InputViewController::textFieldDidAbortEditing(TextField * textField) {
@@ -70,31 +67,29 @@ bool InputViewController::textFieldDidReceiveEvent(TextField * textField, Ion::E
   return m_textFieldDelegate->textFieldDidReceiveEvent(textField, event);
 }
 
-Toolbox * InputViewController::toolboxForTextInput(TextInput * input) {
-  return m_textFieldDelegate->toolboxForTextInput(input);
-}
-
-bool InputViewController::expressionLayoutFieldShouldFinishEditing(ExpressionLayoutField * expressionLayoutField, Ion::Events::Event event) {
+bool InputViewController::layoutFieldShouldFinishEditing(LayoutField * layoutField, Ion::Events::Event event) {
   return event == Ion::Events::OK || event == Ion::Events::EXE;
 }
 
-bool InputViewController::expressionLayoutFieldDidReceiveEvent(ExpressionLayoutField * expressionLayoutField, Ion::Events::Event event) {
-  return m_expressionLayoutFieldDelegate->expressionLayoutFieldDidReceiveEvent(expressionLayoutField, event);
+bool InputViewController::layoutFieldDidReceiveEvent(LayoutField * layoutField, Ion::Events::Event event) {
+  return m_layoutFieldDelegate->layoutFieldDidReceiveEvent(layoutField, event);
 }
 
-bool InputViewController::expressionLayoutFieldDidFinishEditing(ExpressionLayoutField * expressionLayoutField, Poincare::ExpressionLayout * layout, Ion::Events::Event event) {
-  inputViewDidFinishEditing();
-  m_expressionLayoutFieldDelegate->expressionLayoutFieldDidFinishEditing(expressionLayoutField, layout, event);
-  return true;
+bool InputViewController::layoutFieldDidFinishEditing(LayoutField * layoutField, Poincare::Layout layoutR, Ion::Events::Event event) {
+  if (inputViewDidFinishEditing()) {
+    m_layoutFieldDelegate->layoutFieldDidFinishEditing(layoutField, layoutR, event);
+    return true;
+  }
+  return false;
 }
 
-bool InputViewController::expressionLayoutFieldDidAbortEditing(ExpressionLayoutField * expressionLayoutField) {
+bool InputViewController::layoutFieldDidAbortEditing(LayoutField * layoutField) {
   inputViewDidAbortEditing();
-  m_expressionLayoutFieldDelegate->expressionLayoutFieldDidAbortEditing(expressionLayoutField);
+  m_layoutFieldDelegate->layoutFieldDidAbortEditing(layoutField);
   return true;
 }
 
-void InputViewController::expressionLayoutFieldDidChangeSize(ExpressionLayoutField * expressionLayoutField) {
+void InputViewController::layoutFieldDidChangeSize(LayoutField * layoutField) {
   /* Reload the view only if the ExpressionField height actually changes, i.e.
    * not if the height is already maximal and stays maximal. */
   bool newInputViewHeightIsMaximal = m_expressionFieldController.expressionField()->heightIsMaximal();
@@ -104,13 +99,20 @@ void InputViewController::expressionLayoutFieldDidChangeSize(ExpressionLayoutFie
   }
 }
 
-Toolbox * InputViewController::toolboxForExpressionLayoutField(ExpressionLayoutField * expressionLayoutField) {
-  return m_expressionLayoutFieldDelegate->toolboxForExpressionLayoutField(expressionLayoutField);
+Toolbox * InputViewController::toolboxForInputEventHandler(InputEventHandler * handler) {
+  return m_inputEventHandlerDelegate->toolboxForInputEventHandler(handler);
 }
 
-void InputViewController::inputViewDidFinishEditing() {
-  m_successAction.perform(this);
-  dismissModalViewController();
+NestedMenuController * InputViewController::variableBoxForInputEventHandler(InputEventHandler * handler) {
+  return m_inputEventHandlerDelegate->variableBoxForInputEventHandler(handler);
+}
+
+bool InputViewController::inputViewDidFinishEditing() {
+  if (m_successAction.perform(this)) {
+    dismissModalViewController();
+    return true;
+  }
+  return false;
 }
 
 void InputViewController::inputViewDidAbortEditing() {

@@ -18,22 +18,11 @@ extern "C" {
 
 #define USE_SD_CARD 0
 
+extern "C" {
+  extern const void * _stack_end;
+}
+
 // Public Ion methods
-
-/* TODO: The delay methods 'msleep' and 'usleep' are currently dependent on the
- * optimizations chosen by the compiler. To prevent that and to gain in
- * precision, we could use the controller cycle counter (Systick). */
-
-void Ion::msleep(long ms) {
-  for (volatile long i=0; i<8852*ms; i++) {
-      __asm volatile("nop");
-  }
-}
-void Ion::usleep(long us) {
-  for (volatile long i=0; i<9*us; i++) {
-    __asm volatile("nop");
-  }
-}
 
 uint32_t Ion::crc32(const uint32_t * data, size_t length) {
   bool initialCRCEngineState = RCC.AHB1ENR()->getCRCEN();
@@ -94,6 +83,36 @@ void initFPU() {
   CM4.CPACR()->setAccess(10, CM4::CPACR::Access::Full);
   CM4.CPACR()->setAccess(11, CM4::CPACR::Access::Full);
   // FIXME: The pipeline should be flushed at this point
+}
+
+#if 0
+void initMPU() {
+  /* Region 0 reprensents the last 128 bytes of the stack: accessing this
+   * memory means we are really likely to overflow the stack very soon. */
+  MPU.RNR()->setREGION(0x00);
+  MPU.RBAR()->setADDR(&_stack_end);
+  MPU.RASR()->setSIZE(MPU::RASR::RegionSize::Bytes128);
+  MPU.RASR()->setENABLE(true);
+  MPU.RASR()->setAP(0x000); // Forbid access
+  MPU.CTRL()->setPRIVDEFENA(true);
+  MPU.CTRL()->setENABLE(true);
+}
+#endif
+
+void initSysTick() {
+  // CPU clock is 96 MHz, and systick clock source is divided by 8
+  // To get 1 ms systick overflow we need to reset it to
+  // 96 000 000 (Hz) / 8 / 1 000 (ms/s) - 1 (because the counter resets *after* counting to 0)
+  CM4.SYST_RVR()->setRELOAD(11999);
+  CM4.SYST_CVR()->setCURRENT(0);
+  CM4.SYST_CSR()->setCLKSOURCE(CM4::SYST_CSR::CLKSOURCE::AHB_DIV8);
+  CM4.SYST_CSR()->setTICKINT(true);
+  CM4.SYST_CSR()->setENABLE(true);
+}
+
+void shutdownSysTick() {
+  CM4.SYST_CSR()->setENABLE(false);
+  CM4.SYST_CSR()->setTICKINT(false);
 }
 
 void coreReset() {
@@ -167,9 +186,11 @@ void initPeripherals() {
 #endif
   Console::Device::init();
   SWD::Device::init();
+  initSysTick();
 }
 
-void shutdownPeripherals() {
+void shutdownPeripherals(bool keepLEDAwake) {
+  shutdownSysTick();
   SWD::Device::shutdown();
   Console::Device::shutdown();
 #if USE_SD_CARD
@@ -177,7 +198,9 @@ void shutdownPeripherals() {
 #endif
   USB::Device::shutdown();
   Battery::Device::shutdown();
-  LED::Device::shutdown();
+  if (!keepLEDAwake) {
+    LED::Device::shutdown();
+  }
   Keyboard::Device::shutdown();
   Backlight::Device::shutdown();
   Display::Device::shutdown();
@@ -265,7 +288,7 @@ void initClocks() {
   RCC.AHB3ENR()->setFSMCEN(true);
 
   // APB1 bus
-  // We're using TIM3
+  // We're using TIM3 for the LEDs
   RCC.APB1ENR()->setTIM3EN(true);
   RCC.APB1ENR()->setPWREN(true);
 
@@ -279,15 +302,21 @@ void initClocks() {
   RCC.APB2ENR()->set(apb2enr);
 }
 
-void shutdownClocks() {
+void shutdownClocks(bool keepLEDAwake) {
   // APB2 bus
   RCC.APB2ENR()->set(0x00008000); // Reset value
 
-  // AHB1
-  RCC.APB1ENR()->set(0x00000400);
-
+  // APB1
+  class RCC::APB1ENR apb1enr(0x00000400); // Reset value
   // AHB1 bus
-  RCC.AHB1ENR()->set(0); // Reset value
+  class RCC::AHB1ENR ahb1enr(0); // Reset value
+  if (keepLEDAwake) {
+    apb1enr.setTIM3EN(true);
+    ahb1enr.setGPIOBEN(true);
+    ahb1enr.setGPIOCEN(true);
+  }
+  RCC.APB1ENR()->set(apb1enr);
+  RCC.AHB1ENR()->set(ahb1enr);
 
   RCC.AHB3ENR()->setFSMCEN(false);
 }

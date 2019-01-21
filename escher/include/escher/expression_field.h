@@ -1,20 +1,20 @@
 #ifndef ESCHER_EXPRESSION_FIELD_H
 #define ESCHER_EXPRESSION_FIELD_H
 
-#include <escher/expression_layout_field.h>
-#include <escher/expression_layout_field_delegate.h>
+#include <escher/layout_field.h>
+#include <escher/layout_field_delegate.h>
 #include <escher/text_field.h>
 #include <escher/text_field_delegate.h>
-#include <poincare/expression_layout.h>
+#include <poincare/layout.h>
 
 class ExpressionField : public Responder, public View {
 public:
-  ExpressionField(Responder * parentResponder, char * textBuffer, int textBufferLength, Poincare::ExpressionLayout * layout, TextFieldDelegate * textFieldDelegate, ExpressionLayoutFieldDelegate * expressionLayoutFieldDelegate);
+  ExpressionField(Responder * parentResponder, char * textBuffer, int textBufferLength, InputEventHandlerDelegate * inputEventHandler, TextFieldDelegate * textFieldDelegate, LayoutFieldDelegate * layoutFieldDelegate);
 
   void setEditing(bool isEditing, bool reinitDraftBuffer = true);
   bool isEditing() const;
   /* Warning: this function is VERY dangerous! Indeed: sometimes the
-   * m_expressionLayoutField might overflow the m_textBuffer once serialized
+   * m_layoutField might overflow the m_textBuffer once serialized
    * and still have been accepted before because the model can hold a longer
    * buffer. This is the case in the application 'Calculation' and we do not
    * use text() there... TODO: change text() for fillTextInBuffer?*/
@@ -24,7 +24,7 @@ public:
   bool editionIsInTextField() const;
   bool isEmpty() const;
   bool heightIsMaximal() const;
-  bool handleEventWithText(const char * text, bool indentation = false, bool forceCursorRightOfText = false) override;
+  bool handleEventWithText(const char * text, bool indentation = false, bool forceCursorRightOfText = false);
 
   /* View */
   int numberOfSubviews() const override { return 1; }
@@ -44,7 +44,7 @@ private:
   KDCoordinate inputViewHeight() const;
   KDCoordinate maximalHeight() const;
   TextField m_textField;
-  ExpressionLayoutField m_expressionLayoutField;
+  LayoutField m_layoutField;
   char *  m_textBuffer;
   int m_textBufferLength;
 };

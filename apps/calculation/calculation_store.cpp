@@ -1,13 +1,10 @@
 #include "calculation_store.h"
 #include <assert.h>
+#include <poincare/rational.h>
+#include <poincare/symbol.h>
 using namespace Poincare;
 
 namespace Calculation {
-
-CalculationStore::CalculationStore() :
-  m_startIndex(0)
-{
-}
 
 Calculation * CalculationStore::push(const char * text, Context * context) {
   Calculation * result = &m_calculations[m_startIndex];
@@ -89,10 +86,9 @@ void CalculationStore::tidy() {
   }
 }
 
-Expression * CalculationStore::ansExpression(Context * context) {
+Expression CalculationStore::ansExpression(Context * context) {
   if (numberOfCalculations() == 0) {
-    static Rational defaultExpression(0);
-    return &defaultExpression;
+    return Rational(0);
   }
   Calculation * lastCalculation = calculationAtIndex(numberOfCalculations()-1);
   /* Special case: the exact output is a Store/Equal expression.
@@ -100,13 +96,13 @@ Expression * CalculationStore::ansExpression(Context * context) {
    * To avoid turning 'ans->A' in '2->A->A' (or 2->A=A) which cannot be parsed),
    * ans is replaced by the approximation output in when any Store or Equal
    * expression appears.*/
-  bool exactOuptutInvolvesStoreEqual = lastCalculation->exactOutput(context)->recursivelyMatches([](const Expression * e, Context & context) {
-          return e->type() == Expression::Type::Store || e->type() == Expression::Type::Equal;
-        }, *context);
-  if (lastCalculation->input()->isApproximate(*context) || exactOuptutInvolvesStoreEqual) {
+  bool exactOuptutInvolvesStoreEqual = lastCalculation->exactOutput().recursivelyMatches([](const Expression e, Context & context, bool replaceSymbols) {
+          return e.type() == ExpressionNode::Type::Store || e.type() == ExpressionNode::Type::Equal;
+        }, *context, false);
+  if (lastCalculation->input().isApproximate(*context) || exactOuptutInvolvesStoreEqual) {
     return lastCalculation->approximateOutput(context);
   }
-  return lastCalculation->exactOutput(context);
+  return lastCalculation->exactOutput();
 }
 
 }

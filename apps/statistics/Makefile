@@ -1,5 +1,5 @@
-snapshots += Statistics::App::Snapshot
-snapshot_headers += apps/statistics/app.h
+apps += Statistics::App
+app_headers += apps/statistics/app.h
 
 app_objs += $(addprefix apps/statistics/,\
   app.o\
@@ -30,5 +30,10 @@ i18n_files += $(addprefix apps/statistics/,\
   base.fr.i18n\
   base.pt.i18n\
 )
+
+tests += $(addprefix apps/statistics/test/,\
+  store.cpp\
+)
+test_objs += $(addprefix apps/statistics/, store.o)
 
 app_images += apps/statistics/stat_icon.png

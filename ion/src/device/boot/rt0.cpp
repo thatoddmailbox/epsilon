@@ -1,10 +1,9 @@
-extern "C" {
-#include "rt0.h"
-}
+#include "isr.h"
 #include <stdint.h>
 #include <string.h>
 #include <ion.h>
 #include "../device.h"
+#include "../timing.h"
 #include "../console.h"
 
 typedef void (*cxx_constructor)();
@@ -28,6 +27,19 @@ void abort() {
 #endif
 }
 
+/* By default, the compiler is free to inline any function call he wants. If the
+ * compiler decides to inline some functions that make use of VFP registers, it
+ * will need to push VFP them onto the stack in calling function's prologue.
+ * Problem: in start()'s prologue, we would never had a chance to enable the FPU
+ * since this function is the first thing called after reset.
+ * We can safely assume that neither memcpy, memset, nor any Ion::Device::init*
+ * method will use floating-point numbers, but ion_main very well can.
+ * To make sure ion_main's potential usage of VFP registers doesn't bubble-up to
+ * start(), we isolate it in its very own non-inlined function call. */
+static void __attribute__((noinline)) non_inlined_ion_main() {
+  return ion_main(0, nullptr);
+}
+
 void start() {
   // This is where execution starts after reset.
   // Many things are not initialized yet so the code here has to pay attention.
@@ -48,6 +60,10 @@ void start() {
   /* Initialize the FPU as early as possible.
    * For example, static C++ objects are very likely to manipulate float values */
   Ion::Device::initFPU();
+
+#if 0
+  Ion::Device::initMPU();
+#endif
 
   /* Call static C++ object constructors
    * The C++ compiler creates an initialization function for each static object.
@@ -71,7 +87,11 @@ void start() {
 
   Ion::Device::init();
 
-  ion_main(0, nullptr);
+  non_inlined_ion_main();
 
   abort();
+}
+
+void __attribute__((interrupt)) isr_systick() {
+  Ion::Timing::Device::MillisElapsed++;
 }

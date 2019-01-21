@@ -5,12 +5,11 @@
 #include <string.h>
 #include <escher/scrollable_view.h>
 #include <escher/text_cursor_view.h>
-#include <escher/text_input_delegate.h>
 
 class TextInput : public ScrollableView, public ScrollViewDataSource {
 public:
   TextInput(Responder * parentResponder, View * contentView);
-  Toolbox * toolbox() override;
+  void setFont(const KDFont * font) { contentView()->setFont(font); }
   const char * text() const { return nonEditableContentView()->text(); }
   bool removeChar();
   size_t cursorLocation() const { return nonEditableContentView()->cursorLocation(); }
@@ -19,7 +18,9 @@ public:
 protected:
   class ContentView : public View {
   public:
-    ContentView(KDText::FontSize size);
+    ContentView(const KDFont * font);
+    void setFont(const KDFont * font);
+    const KDFont * font() const { return m_font; }
     size_t cursorLocation() const { return m_cursorIndex; }
     void setCursorLocation(int cursorLocation);
     virtual const char * text() const = 0;
@@ -33,7 +34,7 @@ protected:
     void reloadRectFromCursorPosition(size_t index, bool lineBreak = false);
     virtual KDRect characterFrameAtIndex(size_t index) const = 0;
     TextCursorView m_cursorView;
-    KDText::FontSize m_fontSize;
+    const KDFont * m_font;
     size_t m_cursorIndex;
   private:
     int numberOfSubviews() const override;
@@ -45,13 +46,14 @@ protected:
    * buffer, nothing is done (not even adding few letters from the text to reach
    * the maximum buffer capacity) and false is returned. */
   bool insertTextAtLocation(const char * textBuffer, int location);
-  virtual bool removeEndOfLine();
+  bool removeEndOfLine();
   ContentView * contentView() {
     return const_cast<ContentView *>(nonEditableContentView());
   }
   virtual const ContentView * nonEditableContentView() const = 0;
 private:
-  virtual TextInputDelegate * delegate() = 0;
+  virtual void willSetCursorLocation(int * location) {}
+  virtual bool privateRemoveEndOfLine();
 };
 
 #endif

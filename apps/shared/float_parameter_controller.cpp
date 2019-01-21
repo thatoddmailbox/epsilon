@@ -11,8 +11,13 @@ using namespace Poincare;
 namespace Shared {
 
 FloatParameterController::FloatParameterController(Responder * parentResponder) :
-  DynamicViewController(parentResponder),
-  m_okButton(nullptr)
+  ViewController(parentResponder),
+  m_selectableTableView(this, this, this),
+  m_okButton(&m_selectableTableView, I18n::Message::Ok, Invocation([](void * context, void * sender) {
+      FloatParameterController * parameterController = (FloatParameterController *) context;
+      parameterController->buttonAction();
+      return true;
+    }, this))
 {
 }
 
@@ -24,11 +29,10 @@ void FloatParameterController::didBecomeFirstResponder() {
     selColumn = selColumn >= numberOfColumns() ? numberOfColumns() - 1 : selColumn;
     selectCellAtLocation(selColumn, selRow);
   }
-  app()->setFirstResponder(selectableTableView());
+  app()->setFirstResponder(&m_selectableTableView);
 }
 
 void FloatParameterController::viewWillAppear() {
-  DynamicViewController::viewWillAppear();
   if (selectedRow() == -1 || selectedRow() == numberOfRows()-1) {
     selectCellAtLocation(0, 0);
   } else {
@@ -38,13 +42,13 @@ void FloatParameterController::viewWillAppear() {
     selColumn = selColumn >= numberOfColumns() ? numberOfColumns() - 1 : selColumn;
     selectCellAtLocation(selColumn, selRow);
   }
-  selectableTableView()->reloadData();
+  m_selectableTableView.reloadData();
 }
 
 void FloatParameterController::willExitResponderChain(Responder * nextFirstResponder) {
   if (parentResponder() == nullptr) {
-    selectableTableView()->deselectTable();
-    selectableTableView()->scrollToCell(0,0);
+    m_selectableTableView.deselectTable();
+    m_selectableTableView.scrollToCell(0,0);
   }
 }
 
@@ -72,7 +76,7 @@ int FloatParameterController::reusableCellCount(int type) {
 
 HighlightCell * FloatParameterController::reusableCell(int index, int type) {
   if (type == 0) {
-    return m_okButton;
+    return &m_okButton;
   }
   return reusableParameterCell(index, type);
 }
@@ -107,7 +111,7 @@ void FloatParameterController::willDisplayCellForIndex(HighlightCell * cell, int
     return;
   }
   char buffer[PrintFloat::bufferSizeForFloatsWithPrecision(Constant::LargeNumberOfSignificantDigits)];
-  PrintFloat::convertFloatToText<double>(parameterAtIndex(index), buffer, PrintFloat::bufferSizeForFloatsWithPrecision(Constant::LargeNumberOfSignificantDigits), Constant::LargeNumberOfSignificantDigits, PrintFloat::Mode::Decimal);
+  PrintFloat::convertFloatToText<double>(parameterAtIndex(index), buffer, PrintFloat::bufferSizeForFloatsWithPrecision(Constant::LargeNumberOfSignificantDigits), Constant::LargeNumberOfSignificantDigits, Preferences::PrintFloatMode::Decimal);
   myCell->setAccessoryText(buffer);
 }
 
@@ -128,12 +132,12 @@ bool FloatParameterController::textFieldDidFinishEditing(TextField * textField, 
   if (!setParameterAtIndex(selectedRow(), floatBody)) {
     return false;
   }
-  selectableTableView()->reloadCellAtLocation(0, activeCell());
-  selectableTableView()->reloadData();
+  m_selectableTableView.reloadCellAtLocation(0, activeCell());
+  m_selectableTableView.reloadData();
   if (event == Ion::Events::EXE || event == Ion::Events::OK) {
-    selectableTableView()->selectCellAtLocation(selectedColumn(), selectedRow()+1);
+    m_selectableTableView.selectCellAtLocation(selectedColumn(), selectedRow()+1);
   } else {
-    selectableTableView()->handleEvent(event);
+    m_selectableTableView.handleEvent(event);
   }
   return true;
 }
@@ -150,32 +154,9 @@ StackViewController * FloatParameterController::stackController() {
   return (StackViewController *)parentResponder();
 }
 
-SelectableTableView * FloatParameterController::selectableTableView() {
-  return (SelectableTableView *)view();
-}
-
 void FloatParameterController::buttonAction() {
   StackViewController * stack = stackController();
   stack->pop();
-}
-
-I18n::Message FloatParameterController::okButtonText() {
-  return I18n::Message::Ok;
-}
-
-View * FloatParameterController::loadView() {
-  SelectableTableView * tableView = new SelectableTableView(this, this, this);
-  m_okButton = new ButtonWithSeparator(tableView, okButtonText(), Invocation([](void * context, void * sender) {
-    FloatParameterController * parameterController = (FloatParameterController *) context;
-    parameterController->buttonAction();
-  }, this));
-  return tableView;
-}
-
-void FloatParameterController::unloadView(View * view) {
-  delete m_okButton;
-  m_okButton = nullptr;
-  delete view;
 }
 
 }

@@ -1,5 +1,5 @@
-snapshots += Code::App::Snapshot
-snapshot_headers += apps/code/app.h
+apps += Code::App
+app_headers += apps/code/app.h
 
 app_objs += $(addprefix apps/code/,\
   app.o\
@@ -15,6 +15,7 @@ app_objs += $(addprefix apps/code/,\
   python_text_area.o\
   sandbox_controller.o\
   script.o\
+  script_name_cell.o\
   script_node_cell.o\
   script_parameter_controller.o\
   script_store.o\

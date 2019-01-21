@@ -1,57 +1,62 @@
 #include <poincare/tangent.h>
-#include <poincare/sine.h>
 #include <poincare/cosine.h>
 #include <poincare/division.h>
-#include <poincare/multiplication.h>
+#include <poincare/layout_helper.h>
+#include <poincare/serialization_helper.h>
+#include <poincare/simplification_helper.h>
+#include <poincare/sine.h>
 #include <poincare/trigonometry.h>
-#include <poincare/hyperbolic_tangent.h>
-#include <poincare/simplification_engine.h>
-extern "C" {
-#include <assert.h>
-}
 #include <cmath>
 
 namespace Poincare {
 
-Expression::Type Tangent::type() const {
-  return Expression::Type::Tangent;
+constexpr Expression::FunctionHelper Tangent::s_functionHelper;
+
+int TangentNode::numberOfChildren() const { return Tangent::s_functionHelper.numberOfChildren(); }
+
+float TangentNode::characteristicXRange(Context & context, Preferences::AngleUnit angleUnit) const {
+  return Trigonometry::characteristicXRange(Tangent(this), context, angleUnit);
 }
 
-Expression * Tangent::clone() const {
-  Tangent * a = new Tangent(m_operands, true);
-  return a;
+Layout TangentNode::createLayout(Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const {
+  return LayoutHelper::Prefix(Tangent(this), floatDisplayMode, numberOfSignificantDigits, Tangent::s_functionHelper.name());
 }
 
-float Tangent::characteristicXRange(Context & context, AngleUnit angleUnit) const {
-  return Trigonometry::characteristicXRange(this, context, angleUnit);
+int TangentNode::serialize(char * buffer, int bufferSize, Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const {
+  return SerializationHelper::Prefix(this, buffer, bufferSize, floatDisplayMode, numberOfSignificantDigits, Tangent::s_functionHelper.name());
 }
 
 template<typename T>
-std::complex<T> Tangent::computeOnComplex(const std::complex<T> c, AngleUnit angleUnit) {
+Complex<T> TangentNode::computeOnComplex(const std::complex<T> c, Preferences::AngleUnit angleUnit) {
   std::complex<T> angleInput = Trigonometry::ConvertToRadian(c, angleUnit);
   std::complex<T> res = std::tan(angleInput);
-  return Trigonometry::RoundToMeaningfulDigits(res);
+  return Complex<T>(Trigonometry::RoundToMeaningfulDigits(res, angleInput));
 }
 
-Expression * Tangent::shallowReduce(Context& context, AngleUnit angleUnit) {
-  Expression * e = Expression::shallowReduce(context, angleUnit);
-  if (e != this) {
-    return e;
+Expression TangentNode::shallowReduce(Context & context, Preferences::AngleUnit angleUnit, bool replaceSymbols) {
+  return Tangent(this).shallowReduce(context, angleUnit, replaceSymbols);
+}
+
+Expression Tangent::shallowReduce(Context & context, Preferences::AngleUnit angleUnit, bool replaceSymbols) {
+  {
+    Expression e = Expression::defaultShallowReduce(context, angleUnit);
+    if (e.isUndefined()) {
+      return e;
+    }
   }
 #if MATRIX_EXACT_REDUCING
-  Expression * op = editableOperand(0);
-  if (op->type() == Type::Matrix) {
-    return SimplificationEngine::map(this, context, angleUnit);
+  Expression op = childAtIndex(0);
+  if (op.type() == ExpressionNode::Type::Matrix) {
+    return SimplificationHelper::Map(*this, context, angleUnit);
   }
 #endif
-  Expression * newExpression = Trigonometry::shallowReduceDirectFunction(this, context, angleUnit);
-  if (newExpression->type() == Type::Tangent) {
-    const Expression * op[1] = {newExpression->operand(0)};
-    Sine * s = new Sine(op, true);
-    Cosine * c = new Cosine(op, true);
-    Division * d = new Division(s, c, false);
-    newExpression = newExpression->replaceWith(d, true);
-    return newExpression->shallowReduce(context, angleUnit);
+  Expression newExpression = Trigonometry::shallowReduceDirectFunction(*this, context, angleUnit);
+  if (newExpression.type() == ExpressionNode::Type::Tangent) {
+    Sine s = Sine::Builder(newExpression.childAtIndex(0).clone());
+    Cosine c = Cosine::Builder(newExpression.childAtIndex(0));
+    Division d = Division(s, c);
+    newExpression.replaceWithInPlace(d);
+    return d.shallowReduce(context, angleUnit);
   }
   return newExpression;
 }

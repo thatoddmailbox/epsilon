@@ -1,10 +1,9 @@
 #include "term_sum_controller.h"
 #include "../../shared/text_field_delegate.h"
 #include "../app.h"
-
-#include "../../../poincare/src/layout/char_layout.h"
-#include "../../../poincare/src/layout/horizontal_layout.h"
-#include "../../../poincare/src/layout/vertical_offset_layout.h"
+#include <poincare/char_layout.h>
+#include <poincare/horizontal_layout.h>
+#include <poincare/vertical_offset_layout.h>
 
 #include <cmath>
 
@@ -18,8 +17,8 @@ using namespace Poincare;
 
 namespace Sequence {
 
-TermSumController::TermSumController(Responder * parentResponder, GraphView * graphView, CurveViewRange * graphRange, CurveViewCursor * cursor) :
-  SumGraphController(parentResponder, graphView, graphRange, cursor, Ion::Charset::CapitalSigma)
+TermSumController::TermSumController(Responder * parentResponder, ::InputEventHandlerDelegate * inputEventHandlerDelegate, GraphView * graphView, CurveViewRange * graphRange, CurveViewCursor * cursor) :
+  SumGraphController(parentResponder, inputEventHandlerDelegate, graphView, graphRange, cursor, Ion::Charset::CapitalSigma)
 {
 }
 
@@ -50,14 +49,14 @@ double TermSumController::cursorNextStep(double x, int direction) {
   return std::round(m_cursor->x()+delta);
 }
 
-ExpressionLayout * TermSumController::createFunctionLayout(const char * functionName) {
-  return new HorizontalLayout(
-      new CharLayout(functionName[0], KDText::FontSize::Small),
-      new VerticalOffsetLayout(
-        new CharLayout('n', KDText::FontSize::Small),
-        VerticalOffsetLayout::Type::Subscript,
-        false),
-      false);
+Layout TermSumController::createFunctionLayout(const char * functionName) {
+  return HorizontalLayout(
+      CharLayout(functionName[0], KDFont::SmallFont),
+        VerticalOffsetLayout(
+          CharLayout('n', KDFont::SmallFont),
+          VerticalOffsetLayoutNode::Type::Subscript
+        )
+      );
 }
 
 }

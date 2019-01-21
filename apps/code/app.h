@@ -3,6 +3,7 @@
 
 #include <escher.h>
 #include <ion/events.h>
+#include "../shared/input_event_handler_delegate_app.h"
 #include "console_controller.h"
 #include "menu_controller.h"
 #include "script_store.h"
@@ -11,9 +12,9 @@
 
 namespace Code {
 
-class App : public ::App {
+class App : public Shared::InputEventHandlerDelegateApp {
 public:
-  class Descriptor : public ::App::Descriptor {
+  class Descriptor : public Shared::InputEventHandlerDelegateApp::Descriptor {
   public:
     I18n::Message name() override;
     I18n::Message upperName() override;
@@ -23,7 +24,6 @@ public:
   public:
     Snapshot();
     App * unpack(Container * container) override;
-    void reset() override;
     Descriptor * descriptor() override;
     ScriptStore * scriptStore();
 #if EPSILON_GETOPT
@@ -36,12 +36,45 @@ public:
 #endif
     ScriptStore m_scriptStore;
   };
+  ~App();
+  bool prepareForExit() override {
+    if (m_consoleController.inputRunLoopActive()) {
+      m_consoleController.terminateInputLoop();
+      return false;
+    }
+    return true;
+  }
   StackViewController * stackViewController() { return &m_codeStackViewController; }
   ConsoleController * consoleController() { return &m_consoleController; }
-  PythonToolbox * pythonToolbox() { return &m_toolbox; }
+
+  /* Responder */
   bool handleEvent(Ion::Events::Event event) override;
-  bool textInputDidReceiveEvent(TextInput * textInput, Ion::Events::Event event);
+
+  /* InputEventHandlerDelegate */
+  Toolbox * toolboxForInputEventHandler(InputEventHandler * textInput) override;
+  VariableBoxController * variableBoxForInputEventHandler(InputEventHandler * textInput) override;
+
+  /* TextInputDelegate */
+  bool textInputDidReceiveEvent(InputEventHandler * textInput, Ion::Events::Event event);
+
+  /* Code::App */
+  // Python delegate
+  bool pythonIsInited() { return m_pythonUser != nullptr; }
+  bool isPythonUser(const void * pythonUser) { return m_pythonUser == pythonUser; }
+  void initPythonWithUser(const void * pythonUser);
+  void deinitPython();
+
+  VariableBoxController * variableBoxController() { return &m_variableBoxController; }
 private:
+  /* Python delegate:
+   * MicroPython requires a heap. To avoid dynamic allocation, we keep a working
+   * buffer here and we give to controllers that load Python environment. We
+   * also memoize the last Python user to avoid re-initiating MicroPython when
+   * unneeded. */
+  static constexpr int k_pythonHeapSize = 16384;
+  char m_pythonHeap[k_pythonHeapSize];
+  const void * m_pythonUser;
+
   App(Container * container, Snapshot * snapshot);
   ConsoleController m_consoleController;
   ButtonRowController m_listFooter;

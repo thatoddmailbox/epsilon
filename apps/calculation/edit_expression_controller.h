@@ -2,10 +2,10 @@
 #define CALCULATION_EDIT_EXPRESSION_CONTROLLER_H
 
 #include <escher.h>
-#include <poincare/expression_layout.h>
+#include <poincare/layout.h>
 #include "expression_field.h"
 #include "../shared/text_field_delegate.h"
-#include "../shared/expression_layout_field_delegate.h"
+#include "../shared/layout_field_delegate.h"
 #include "history_controller.h"
 #include "calculation_store.h"
 
@@ -13,12 +13,12 @@ namespace Calculation {
 class HistoryController;
 
 /* TODO: implement a split view */
-class EditExpressionController : public DynamicViewController, public Shared::TextFieldDelegate, public Shared::ExpressionLayoutFieldDelegate {
+class EditExpressionController : public ViewController, public Shared::TextFieldDelegate, public Shared::LayoutFieldDelegate {
 public:
-  EditExpressionController(Responder * parentResponder, HistoryController * historyController, CalculationStore * calculationStore);
+  EditExpressionController(Responder * parentResponder, InputEventHandlerDelegate * inputEventHandlerDelegate, HistoryController * historyController, CalculationStore * calculationStore);
+  View * view() override;
   void didBecomeFirstResponder() override;
   void viewDidDisappear() override;
-  bool handleEvent(Ion::Events::Event event) override;
   void insertTextBody(const char * text);
 
   /* TextFieldDelegate */
@@ -26,21 +26,16 @@ public:
   bool textFieldDidFinishEditing(::TextField * textField, const char * text, Ion::Events::Event event) override;
   bool textFieldDidAbortEditing(::TextField * textField) override;
 
-  /* ExpressionLayoutFieldDelegate */
-  bool expressionLayoutFieldDidReceiveEvent(::ExpressionLayoutField * expressionLayoutField, Ion::Events::Event event) override;
-  bool expressionLayoutFieldDidFinishEditing(::ExpressionLayoutField * expressionLayoutField, Poincare::ExpressionLayout * layout, Ion::Events::Event event) override;
-  bool expressionLayoutFieldDidAbortEditing(::ExpressionLayoutField * expressionLayoutField) override;
-  void expressionLayoutFieldDidChangeSize(::ExpressionLayoutField * expressionLayoutField) override;
+  /* LayoutFieldDelegate */
+  bool layoutFieldDidReceiveEvent(::LayoutField * layoutField, Ion::Events::Event event) override;
+  bool layoutFieldDidFinishEditing(::LayoutField * layoutField, Poincare::Layout layoutR, Ion::Events::Event event) override;
+  bool layoutFieldDidAbortEditing(::LayoutField * layoutField) override;
+  void layoutFieldDidChangeSize(::LayoutField * layoutField) override;
 
 private:
   class ContentView : public View {
   public:
-    ContentView(Responder * parentResponder, TableView * subview, TextFieldDelegate * textFieldDelegate, ExpressionLayoutFieldDelegate * expressionLayoutFieldDelegate);
-    ~ContentView();
-    ContentView(const ContentView& other) = delete;
-    ContentView(ContentView&& other) = delete;
-    ContentView& operator=(const ContentView& other) = delete;
-    ContentView& operator=(ContentView&& other) = delete;
+    ContentView(Responder * parentResponder, TableView * subview, InputEventHandlerDelegate * inputEventHandlerDelegate, TextFieldDelegate * textFieldDelegate, LayoutFieldDelegate * layoutFieldDelegate);
     void reload();
     TableView * mainView() { return m_mainView; }
     ExpressionField * expressionField() { return &m_expressionField; }
@@ -52,20 +47,19 @@ private:
     static constexpr int k_bufferLength = TextField::maxBufferSize();
     TableView * m_mainView;
     char m_textBody[k_bufferLength];
-    Poincare::ExpressionLayout * m_layout;
     ExpressionField m_expressionField;
   };
-  View * loadView() override;
-  void unloadView(View * view) override;
   void reloadView();
-  bool inputViewDidReceiveEvent(Ion::Events::Event event);
-  bool inputViewDidFinishEditing(const char * text, Poincare::ExpressionLayout * layout);
+  bool inputViewDidReceiveEvent(Ion::Events::Event event, bool shouldDuplicateLastCalculation);
+  bool inputViewDidFinishEditing(const char * text, Poincare::Layout layoutR);
   bool inputViewDidAbortEditing(const char * text);
   Shared::TextFieldDelegateApp * textFieldDelegateApp() override;
   Shared::ExpressionFieldDelegateApp * expressionFieldDelegateApp() override;
-  char m_cacheBuffer[Calculation::k_printedExpressionSize];
+  static constexpr int k_cacheBufferSize = Constant::MaxSerializedExpressionSize;
+  char m_cacheBuffer[k_cacheBufferSize];
   HistoryController * m_historyController;
   CalculationStore * m_calculationStore;
+  ContentView m_contentView;
   bool m_inputViewHeightIsMaximal;
 };
 

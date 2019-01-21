@@ -1,49 +1,53 @@
 #include <poincare/sine.h>
-#include <poincare/trigonometry.h>
-#include <poincare/hyperbolic_sine.h>
-#include <poincare/multiplication.h>
-#include <poincare/symbol.h>
-#include <poincare/simplification_engine.h>
-#include <ion.h>
-extern "C" {
-#include <assert.h>
-}
+#include <poincare/complex.h>
+#include <poincare/layout_helper.h>
+#include <poincare/serialization_helper.h>
+#include <poincare/simplification_helper.h>
 #include <cmath>
 
 namespace Poincare {
 
-Expression::Type Sine::type() const {
-  return Expression::Type::Sine;
-}
+constexpr Expression::FunctionHelper Sine::s_functionHelper;
 
-Expression * Sine::clone() const {
-  Sine * a = new Sine(m_operands, true);
-  return a;
-}
+int SineNode::numberOfChildren() const { return Sine::s_functionHelper.numberOfChildren(); }
 
-float Sine::characteristicXRange(Context & context, AngleUnit angleUnit) const {
-  return Trigonometry::characteristicXRange(this, context, angleUnit);
+float SineNode::characteristicXRange(Context & context, Preferences::AngleUnit angleUnit) const {
+  return Trigonometry::characteristicXRange(Sine(this), context, angleUnit);
 }
 
 template<typename T>
-std::complex<T> Sine::computeOnComplex(const std::complex<T> c, AngleUnit angleUnit) {
+Complex<T> SineNode::computeOnComplex(const std::complex<T> c, Preferences::AngleUnit angleUnit) {
   std::complex<T> angleInput = Trigonometry::ConvertToRadian(c, angleUnit);
   std::complex<T> res = std::sin(angleInput);
-  return Trigonometry::RoundToMeaningfulDigits(res);
+  return Complex<T>(Trigonometry::RoundToMeaningfulDigits(res, angleInput));
 }
 
-Expression * Sine::shallowReduce(Context& context, AngleUnit angleUnit) {
-  Expression * e = Expression::shallowReduce(context, angleUnit);
-  if (e != this) {
-    return e;
+Layout SineNode::createLayout(Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const {
+  return LayoutHelper::Prefix(Sine(this), floatDisplayMode, numberOfSignificantDigits, Sine::s_functionHelper.name());
+}
+
+int SineNode::serialize(char * buffer, int bufferSize, Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const {
+  return SerializationHelper::Prefix(this, buffer, bufferSize, floatDisplayMode, numberOfSignificantDigits, Sine::s_functionHelper.name());
+}
+
+Expression SineNode::shallowReduce(Context & context, Preferences::AngleUnit angleUnit, bool replaceSymbols) {
+  return Sine(this).shallowReduce(context, angleUnit, replaceSymbols);
+}
+
+Expression Sine::shallowReduce(Context & context, Preferences::AngleUnit angleUnit, bool replaceSymbols) {
+  {
+    Expression e = Expression::defaultShallowReduce(context, angleUnit);
+    if (e.isUndefined()) {
+      return e;
+    }
   }
 #if MATRIX_EXACT_REDUCING
-  Expression * op = editableOperand(0);
-  if (op->type() == Type::Matrix) {
-    return SimplificationEngine::map(this, context, angleUnit);
+  Expression op = childAtIndex(0);
+  if (op.type() == ExpressionNode::Type::Matrix) {
+    return SimplificationHelper::Map(*this, context, angleUnit);
   }
 #endif
-  return Trigonometry::shallowReduceDirectFunction(this, context, angleUnit);
+  return Trigonometry::shallowReduceDirectFunction(*this, context, angleUnit);
 }
 
 }

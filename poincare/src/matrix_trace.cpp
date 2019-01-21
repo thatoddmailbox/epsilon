@@ -1,60 +1,71 @@
 #include <poincare/matrix_trace.h>
-#include <poincare/matrix.h>
-#include <poincare/undefined.h>
 #include <poincare/addition.h>
-extern "C" {
-#include <assert.h>
-}
+#include <poincare/layout_helper.h>
+#include <poincare/matrix.h>
+#include <poincare/rational.h>
+#include <poincare/serialization_helper.h>
+#include <poincare/undefined.h>
 #include <cmath>
 
 namespace Poincare {
 
-Expression::Type MatrixTrace::type() const {
-  return Type::MatrixTrace;
+constexpr Expression::FunctionHelper MatrixTrace::s_functionHelper;
+
+int MatrixTraceNode::numberOfChildren() const { return MatrixTrace::s_functionHelper.numberOfChildren(); }
+
+Expression MatrixTraceNode::shallowReduce(Context & context, Preferences::AngleUnit angleUnit, bool replaceSymbols) {
+  return MatrixTrace(this).shallowReduce(context, angleUnit, replaceSymbols);
 }
 
-Expression * MatrixTrace::clone() const {
-  MatrixTrace * a = new MatrixTrace(m_operands, true);
-  return a;
+Layout MatrixTraceNode::createLayout(Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const {
+  return LayoutHelper::Prefix(MatrixTrace(this), floatDisplayMode, numberOfSignificantDigits, MatrixTrace::s_functionHelper.name());
 }
 
-Expression * MatrixTrace::shallowReduce(Context& context, AngleUnit angleUnit) {
-  Expression * e = Expression::shallowReduce(context, angleUnit);
-  if (e != this) {
-    return e;
-  }
-  Expression * op = editableOperand(0);
-#if MATRIX_EXACT_REDUCING
-  if (op->type() == Type::Matrix) {
-    Matrix * m = static_cast<Matrix *>(op);
-    if (m->numberOfRows() != m->numberOfColumns()) {
-      return replaceWith(new Undefined(), true);
-    }
-    int n = m->numberOfRows();
-    Addition * a = new Addition();
-    for (int i = 0; i < n; i++) {
-      Expression * diagEntry = m->editableOperand(i+n*i);
-      m->detachOperand(diagEntry);
-      a->addOperand(diagEntry);
-    }
-    return replaceWith(a, true)->shallowReduce(context, angleUnit);
-  }
-  if (!op->recursivelyMatches(Expression::IsMatrix)) {
-    return replaceWith(op, true);
-  }
-  return this;
-#else
-  return replaceWith(op, true);
-#endif
+int MatrixTraceNode::serialize(char * buffer, int bufferSize, Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const {
+  return SerializationHelper::Prefix(this, buffer, bufferSize, floatDisplayMode, numberOfSignificantDigits, MatrixTrace::s_functionHelper.name());
 }
 
 template<typename T>
-Complex<T> * MatrixTrace::templatedApproximate(Context& context, AngleUnit angleUnit) const {
-  Evaluation<T> * input = operand(0)->privateApproximate(T(), context, angleUnit);
-  Complex<T> * result = new Complex<T>(input->createTrace());
-  delete input;
+Evaluation<T> MatrixTraceNode::templatedApproximate(Context& context, Preferences::AngleUnit angleUnit) const {
+  Evaluation<T> input = childAtIndex(0)->approximate(T(), context, angleUnit);
+  Complex<T> result = Complex<T>(input.trace());
   return result;
 }
 
+Expression MatrixTrace::shallowReduce(Context & context, Preferences::AngleUnit angleUnit, bool replaceSymbols) {
+  {
+    Expression e = Expression::defaultShallowReduce(context, angleUnit);
+    if (e.isUndefined()) {
+      return e;
+    }
+  }
+  Expression c = childAtIndex(0);
+#if MATRIX_EXACT_REDUCING
+#if 0
+  if (c.type() == ExpressionNode::Type::Matrix) {
+    Matrix m = static_cast<Matrix&>(c);
+    if (m.numberOfRows() != m.numberOfColumns()) {
+      return Undefined();
+    }
+    int n = m.numberOfRows();
+    Addition a = Addition();
+    for (int i = 0; i < n; i++) {
+      a.addChildAtIndexInPlace(m.childAtIndex(i+n*i), i, a.numberOfChildren());
+    }
+    return a.shallowReduce(context, angleUnit);
+  }
+  if (!c.recursivelyMatches(Expression::IsMatrix)) {
+    return c;
+  }
+  return *this;
+#endif
+#else
+  if (c.type() != ExpressionNode::Type::Matrix) {
+    replaceWithInPlace(c);
+    return c;
+  }
+  return *this;
+#endif
 }
 
+}

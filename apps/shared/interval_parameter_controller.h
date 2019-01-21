@@ -9,7 +9,7 @@ namespace Shared {
 
 class IntervalParameterController : public Shared::FloatParameterController {
 public:
-  IntervalParameterController(Responder * parentResponder, Interval * interval);
+  IntervalParameterController(Responder * parentResponder, InputEventHandlerDelegate * inputEventHandlerDelegate, Interval * interval);
   Interval * interval();
   const char * title() override;
   void willDisplayCellForIndex(HighlightCell * cell, int index) override;
@@ -24,10 +24,8 @@ private:
   int reusableParameterCellCount(int type) override;
   double parameterAtIndex(int index) override;
   void buttonAction() override;
-  View * loadView() override;
-  void unloadView(View * view) override;
   char m_draftTextBuffer[MessageTableCellWithEditableText::k_bufferLength];
-  MessageTableCellWithEditableText * m_intervalCells[k_totalNumberOfCell];
+  MessageTableCellWithEditableText m_intervalCells[k_totalNumberOfCell];
 };
 
 }

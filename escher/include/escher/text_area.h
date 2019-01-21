@@ -2,14 +2,15 @@
 #define ESCHER_TEXT_AREA_H
 
 #include <escher/text_input.h>
+#include <escher/input_event_handler.h>
 #include <escher/text_area_delegate.h>
 #include <assert.h>
 #include <string.h>
 
-class TextArea : public TextInput {
+class TextArea : public TextInput, public InputEventHandler {
 public:
-  TextArea(Responder * parentResponder, View * contentView, KDText::FontSize fontSize = KDText::FontSize::Large);
-  void setDelegate(TextAreaDelegate * delegate) { m_delegate = delegate; }
+  TextArea(Responder * parentResponder, View * contentView, const KDFont * font = KDFont::LargeFont);
+  void setDelegates(InputEventHandlerDelegate * inputEventHandlerDelegate, TextAreaDelegate * delegate) { m_inputEventHandlerDelegate = inputEventHandlerDelegate; m_delegate = delegate; }
   bool handleEvent(Ion::Events::Event event) override;
   bool handleEventWithText(const char * text, bool indentation = false, bool forceCursorRightOfText = false) override;
   void setText(char * textBuffer, size_t textBufferSize);
@@ -17,9 +18,6 @@ public:
 protected:
   int indentationBeforeCursor() const;
   bool insertTextWithIndentation(const char * textBuffer, int location);
-  TextInputDelegate * delegate() override {
-    return m_delegate;
-  }
 
   class Text {
   public:
@@ -93,8 +91,8 @@ protected:
 
   class ContentView : public TextInput::ContentView {
   public:
-    ContentView(KDText::FontSize fontSize) :
-      TextInput::ContentView(fontSize),
+    ContentView(const KDFont * font) :
+      TextInput::ContentView(font),
       m_text(nullptr, 0)
     {
     }

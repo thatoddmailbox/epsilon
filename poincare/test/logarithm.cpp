@@ -1,5 +1,4 @@
 #include <quiz.h>
-#include <poincare.h>
 #include <ion.h>
 #include <assert.h>
 #include "helper.h"
@@ -15,15 +14,27 @@ QUIZ_CASE(poincare_logarithm_evaluate) {
   assert_parsed_expression_evaluates_to<double>("log(6,7+4*I)", "8.0843880717528E-1-2.0108238082167E-1*I");
   assert_parsed_expression_evaluates_to<float>("log(5+2*I)", "0.731199+0.1652518*I");
   assert_parsed_expression_evaluates_to<double>("ln(5+2*I)", "1.6836479149932+3.8050637711236E-1*I");
+  assert_parsed_expression_evaluates_to<double>("log(0,0)", Undefined::Name());
+  assert_parsed_expression_evaluates_to<double>("log(0)", "-inf");
+  assert_parsed_expression_evaluates_to<double>("log(2,0)", "0");
 
   // WARNING: evaluate on branch cut can be multivalued
   assert_parsed_expression_evaluates_to<double>("ln(-4)", "1.3862943611199+3.1415926535898*I");
 }
 
 QUIZ_CASE(poincare_logarithm_simplify) {
+  assert_parsed_expression_simplify_to("log(0,0)", Undefined::Name());
+  assert_parsed_expression_simplify_to("log(0,1)", Undefined::Name());
+  assert_parsed_expression_simplify_to("log(1,0)", "0");
+  assert_parsed_expression_simplify_to("log(2,0)", "0");
+  assert_parsed_expression_simplify_to("log(0,14)", "-inf");
+  assert_parsed_expression_simplify_to("log(0,0.14)", Infinity::Name());
+  assert_parsed_expression_simplify_to("log(0,0.14+I)", Undefined::Name());
+  assert_parsed_expression_simplify_to("log(2,1)", Undefined::Name());
+  assert_parsed_expression_simplify_to("log(x,1)", Undefined::Name());
   assert_parsed_expression_simplify_to("log(12925)", "2*log(5)+log(11)+log(47)");
   assert_parsed_expression_simplify_to("ln(12925)", "2*ln(5)+ln(11)+ln(47)");
-  assert_parsed_expression_simplify_to("log(1742279/12925, 6)", "(-2*log(5,6))+log(7,6)+3*log(11,6)+log(17,6)-log(47,6)");
+  assert_parsed_expression_simplify_to("log(1742279/12925, 6)", "-2*log(5,6)+log(7,6)+3*log(11,6)+log(17,6)-log(47,6)");
   assert_parsed_expression_simplify_to("ln(2/3)", "ln(2)-ln(3)");
   assert_parsed_expression_simplify_to("log(1742279/12925, -6)", "log(158389/1175,-6)");
   assert_parsed_expression_simplify_to("ln(R(2))", "ln(2)/2");
@@ -43,4 +54,10 @@ QUIZ_CASE(poincare_logarithm_simplify) {
   assert_parsed_expression_simplify_to("log(64,2)", "6");
   assert_parsed_expression_simplify_to("log(2,64)", "log(2,64)");
   assert_parsed_expression_simplify_to("log(1476225,5)", "2+10*log(3,5)");
+
+  assert_parsed_expression_simplify_to("log(100)", "2");
+  assert_parsed_expression_simplify_to("log(1000000)", "6");
+  assert_parsed_expression_simplify_to("log(70992768,14)", "5+2*log(2,14)+log(3,14)+log(11,14)");
+  assert_parsed_expression_simplify_to("log(1/6991712,14)", "-5-log(13,14)");
+  assert_parsed_expression_simplify_to("log(4,10)", "2*log(2)");
 }

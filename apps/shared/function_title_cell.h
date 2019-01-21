@@ -11,9 +11,11 @@ public:
     HorizontalIndicator,
     VerticalIndicator
   };
-  FunctionTitleCell(Orientation orientation);
+  FunctionTitleCell(Orientation orientation = Orientation::VerticalIndicator);
+  void setOrientation(Orientation orientation);
   virtual void setColor(KDColor color);
   void drawRect(KDContext * ctx, KDRect rect) const override;
+  virtual const KDFont * font() const = 0;
 protected:
   constexpr static KDCoordinate k_separatorThickness = 1;
   constexpr static KDCoordinate k_colorIndicatorThickness = 2;

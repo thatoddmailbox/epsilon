@@ -1,4 +1,5 @@
 #include "python_text_area.h"
+#include "app.h"
 
 extern "C" {
 #include "py/nlr.h"
@@ -16,6 +17,8 @@ constexpr KDColor KeywordColor = KDColor::RGB24(0xFF000C);
 constexpr KDColor OperatorColor = KDColor::RGB24(0xd73a49);
 constexpr KDColor StringColor = KDColor::RGB24(0x032f62);
 constexpr KDColor BackgroundColor = KDColorWhite;
+
+static inline int min(int x, int y) { return (x<y ? x : y); }
 
 static inline KDColor TokenColor(mp_token_kind_t tokenKind) {
   if (tokenKind == MP_TOKEN_STRING) {
@@ -36,7 +39,7 @@ static inline KDColor TokenColor(mp_token_kind_t tokenKind) {
   return KDColorBlack;
 }
 
-static inline int TokenLength(mp_lexer_t * lex) {
+static inline size_t TokenLength(mp_lexer_t * lex) {
   if (lex->tok_kind == MP_TOKEN_STRING) {
     return lex->vstr.len + 2;
   }
@@ -73,19 +76,11 @@ static inline int TokenLength(mp_lexer_t * lex) {
 }
 
 void PythonTextArea::ContentView::loadSyntaxHighlighter() {
-  assert(m_pythonHeap == nullptr);
-  m_pythonHeap = static_cast<char *>(malloc(k_pythonHeapSize));
-  if (m_pythonHeap != nullptr) {
-    MicroPython::init(m_pythonHeap, m_pythonHeap + k_pythonHeapSize);
-  }
+  m_pythonDelegate->initPythonWithUser(this);
 }
 
 void PythonTextArea::ContentView::unloadSyntaxHighlighter() {
-  if (m_pythonHeap != nullptr) {
-    MicroPython::deinit();
-    free(m_pythonHeap);
-    m_pythonHeap = nullptr;
-  }
+  m_pythonDelegate->deinitPython();
 }
 
 void PythonTextArea::ContentView::clearRect(KDContext * ctx, KDRect rect) const {
@@ -103,7 +98,7 @@ void PythonTextArea::ContentView::clearRect(KDContext * ctx, KDRect rect) const 
 void PythonTextArea::ContentView::drawLine(KDContext * ctx, int line, const char * text, size_t length, int fromColumn, int toColumn) const {
   LOG_DRAW("Drawing \"%.*s\"\n", length, text);
 
-  if (m_pythonHeap == nullptr) {
+  if (!m_pythonDelegate->isPythonUser(this)) {
     drawStringAt(
       ctx,
       line,
@@ -122,7 +117,7 @@ void PythonTextArea::ContentView::drawLine(KDContext * ctx, int line, const char
      * basis. This can work, however the MicroPython lexer won't accept a line
      * starting with a whitespace. So we're discarding leading whitespaces
      * beforehand. */
-    int whitespaceOffset = 0;
+    size_t whitespaceOffset = 0;
     while (text[whitespaceOffset] == ' ' && whitespaceOffset < length) {
       whitespaceOffset++;
     }
@@ -130,8 +125,8 @@ void PythonTextArea::ContentView::drawLine(KDContext * ctx, int line, const char
     mp_lexer_t * lex = mp_lexer_new_from_str_len(0, text + whitespaceOffset, length - whitespaceOffset, 0);
     LOG_DRAW("Pop token %d\n", lex->tok_kind);
 
-    int tokenFrom = 0;
-    int tokenLength = 0;
+    size_t tokenFrom = 0;
+    size_t tokenLength = 0;
     KDColor tokenColor = KDColorBlack;
 
     while (lex->tok_kind != MP_TOKEN_NEWLINE && lex->tok_kind != MP_TOKEN_END) {

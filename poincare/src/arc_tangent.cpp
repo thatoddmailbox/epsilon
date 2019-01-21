@@ -1,48 +1,66 @@
 #include <poincare/arc_tangent.h>
-#include <poincare/trigonometry.h>
-#include <poincare/simplification_engine.h>
-extern "C" {
-#include <assert.h>
-}
+#include <poincare/complex.h>
+#include <poincare/layout_helper.h>
+#include <poincare/serialization_helper.h>
+#include <poincare/simplification_helper.h>
 #include <cmath>
 
 namespace Poincare {
 
-Expression::Type ArcTangent::type() const {
-  return Type::ArcTangent;
+constexpr Expression::FunctionHelper ArcTangent::s_functionHelper;
+
+int ArcTangentNode::numberOfChildren() const { return ArcTangent::s_functionHelper.numberOfChildren(); }
+
+Layout ArcTangentNode::createLayout(Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const {
+  return LayoutHelper::Prefix(ArcTangent(this), floatDisplayMode, numberOfSignificantDigits, ArcTangent::s_functionHelper.name());
 }
 
-Expression * ArcTangent::clone() const {
-  ArcTangent * a = new ArcTangent(m_operands, true);
-  return a;
-}
-
-Expression * ArcTangent::shallowReduce(Context& context, AngleUnit angleUnit) {
-  Expression * e = Expression::shallowReduce(context, angleUnit);
-  if (e != this) {
-    return e;
-  }
-#if MATRIX_EXACT_REDUCING
-  if (operand(0)->type() == Type::Matrix) {
-    return SimplificationEngine::map(this, context, angleUnit);
-  }
-#endif
-  return Trigonometry::shallowReduceInverseFunction(this, context, angleUnit);
+int ArcTangentNode::serialize(char * buffer, int bufferSize, Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const {
+  return SerializationHelper::Prefix(this, buffer, bufferSize, floatDisplayMode, numberOfSignificantDigits, ArcTangent::s_functionHelper.name());
 }
 
 template<typename T>
-std::complex<T> ArcTangent::computeOnComplex(const std::complex<T> c, AngleUnit angleUnit) {
-  std::complex<T> result = std::atan(c);
-  /* atan has a branch cut on ]-inf*i, -i[U]i, +inf*i[: it is then multivalued
-   * on this cut. We followed the convention chosen by the lib c++ of llvm on
-   * ]-i+0, -i*inf+0[ (warning: atan takes the other side of the cut values on
-   * ]-i+0, -i*inf+0[) and choose the values on ]-inf*i, -i[ to comply with
-   * atan(-x) = -atan(x) and sin(arctan(x)) = x/sqrt(1+x^2). */
-  if (c.real() == 0 && c.imag() < -1) {
-    result.real(-result.real()); // other side of the cut
+Complex<T> ArcTangentNode::computeOnComplex(const std::complex<T> c, Preferences::AngleUnit angleUnit) {
+  std::complex<T> result;
+  if (c.imag() == 0 && std::fabs(c.real()) <= 1.0) {
+    /* atan: R -> R
+     * In these cases we rather use std::atan(double) because atan on complexes
+     * is not as precise as atan on double in std library. For instance,
+     * - atan(complex<double>(0.01,0.0) = complex(9.9996666866652E-3,5.5511151231258E-17)
+     * - atan(0.03) = 9.9996666866652E-3 */
+    result = std::atan(c.real());
+  } else {
+    result = std::atan(c);
+    /* atan has a branch cut on ]-inf*i, -i[U]i, +inf*i[: it is then multivalued
+     * on this cut. We followed the convention chosen by the lib c++ of llvm on
+     * ]-i+0, -i*inf+0[ (warning: atan takes the other side of the cut values on
+     * ]-i+0, -i*inf+0[) and choose the values on ]-inf*i, -i[ to comply with
+     * atan(-x) = -atan(x) and sin(arctan(x)) = x/sqrt(1+x^2). */
+    if (c.real() == 0 && c.imag() < -1) {
+      result.real(-result.real()); // other side of the cut
+    }
   }
-  result = Trigonometry::RoundToMeaningfulDigits(result);
-  return Trigonometry::ConvertRadianToAngleUnit(result, angleUnit);
+  result = Trigonometry::RoundToMeaningfulDigits(result, c);
+  return Complex<T>(Trigonometry::ConvertRadianToAngleUnit(result, angleUnit));
+}
+
+Expression ArcTangentNode::shallowReduce(Context & context, Preferences::AngleUnit angleUnit, bool replaceSymbols) {
+  return ArcTangent(this).shallowReduce(context, angleUnit, replaceSymbols);
+}
+
+Expression ArcTangent::shallowReduce(Context & context, Preferences::AngleUnit angleUnit, bool replaceSymbols) {
+  {
+    Expression e = Expression::defaultShallowReduce(context, angleUnit);
+    if (e.isUndefined()) {
+      return e;
+    }
+  }
+#if MATRIX_EXACT_REDUCING
+  if (childAtIndex(0).type() == ExpressionNode::Type::Matrix) {
+    return SimplificationHelper::Map(*this, context, angleUnit);
+  }
+#endif
+  return Trigonometry::shallowReduceInverseFunction(*this, context, angleUnit);
 }
 
 }

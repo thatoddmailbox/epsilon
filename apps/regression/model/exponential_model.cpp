@@ -1,36 +1,38 @@
 #include "exponential_model.h"
 #include <math.h>
 #include <assert.h>
-#include "../../poincare/include/poincare_layouts.h"
+#include <poincare/char_layout.h>
+#include <poincare/horizontal_layout.h>
+#include <poincare/vertical_offset_layout.h>
 
 using namespace Poincare;
 
 namespace Regression {
 
-ExpressionLayout * ExponentialModel::layout() {
-  static ExpressionLayout * layout = nullptr;
-  if (layout == nullptr) {
-    const ExpressionLayout * layoutChildren[] = {
-      new CharLayout('a', KDText::FontSize::Small),
-      new CharLayout(Ion::Charset::MiddleDot, KDText::FontSize::Small),
-      new CharLayout('e', KDText::FontSize::Small),
-      new VerticalOffsetLayout(
-          new HorizontalLayout(
-            new CharLayout('b', KDText::FontSize::Small),
-            new CharLayout(Ion::Charset::MiddleDot, KDText::FontSize::Small),
-            new CharLayout('X', KDText::FontSize::Small),
-            false),
-          VerticalOffsetLayout::Type::Superscript,
-          false)
+Layout ExponentialModel::layout() {
+  if (m_layout.isUninitialized()) {
+    const Layout layoutChildren[] = {
+      CharLayout('a', KDFont::SmallFont),
+      CharLayout(Ion::Charset::MiddleDot, KDFont::SmallFont),
+      CharLayout('e', KDFont::SmallFont),
+      VerticalOffsetLayout(
+          HorizontalLayout(
+            CharLayout('b', KDFont::SmallFont),
+            CharLayout(Ion::Charset::MiddleDot, KDFont::SmallFont),
+            CharLayout('X', KDFont::SmallFont)
+          ),
+          VerticalOffsetLayoutNode::Type::Superscript
+        )
     };
-    layout = new HorizontalLayout(layoutChildren, 4, false);
+    m_layout = HorizontalLayout(layoutChildren, 4);
   }
-  return layout;
+  return m_layout;
 }
 
 double ExponentialModel::evaluate(double * modelCoefficients, double x) const {
   double a = modelCoefficients[0];
   double b = modelCoefficients[1];
+  // a*e^(bx)
   return a*exp(b*x);
 }
 

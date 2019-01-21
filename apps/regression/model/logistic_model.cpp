@@ -1,38 +1,40 @@
 #include "logistic_model.h"
 #include <math.h>
 #include <assert.h>
-#include "../../poincare/include/poincare_layouts.h"
+#include <poincare/char_layout.h>
+#include <poincare/fraction_layout.h>
+#include <poincare/horizontal_layout.h>
+#include <poincare/vertical_offset_layout.h>
 
 using namespace Poincare;
 
 namespace Regression {
 
-ExpressionLayout * LogisticModel::layout() {
-  static ExpressionLayout * layout = nullptr;
-  if (layout == nullptr) {
-    const ExpressionLayout * exponentLayoutChildren[] = {
-      new CharLayout('-', KDText::FontSize::Small),
-      new CharLayout('b', KDText::FontSize::Small),
-      new CharLayout(Ion::Charset::MiddleDot, KDText::FontSize::Small),
-      new CharLayout('X', KDText::FontSize::Small)
+Layout LogisticModel::layout() {
+  if (m_layout.isUninitialized()) {
+    const Layout exponentLayoutChildren[] = {
+      CharLayout('-', KDFont::SmallFont),
+      CharLayout('b', KDFont::SmallFont),
+      CharLayout(Ion::Charset::MiddleDot, KDFont::SmallFont),
+      CharLayout('X', KDFont::SmallFont)
     };
-    const ExpressionLayout * layoutChildren[] = {
-      new CharLayout('1', KDText::FontSize::Small),
-      new CharLayout('+', KDText::FontSize::Small),
-      new CharLayout('a', KDText::FontSize::Small),
-      new CharLayout(Ion::Charset::MiddleDot, KDText::FontSize::Small),
-      new CharLayout('e', KDText::FontSize::Small),
-      new VerticalOffsetLayout(
-          new HorizontalLayout(exponentLayoutChildren, 4, false),
-          VerticalOffsetLayout::Type::Superscript,
-          false)
+    const Layout layoutChildren[] = {
+      CharLayout('1', KDFont::SmallFont),
+      CharLayout('+', KDFont::SmallFont),
+      CharLayout('a', KDFont::SmallFont),
+      CharLayout(Ion::Charset::MiddleDot, KDFont::SmallFont),
+      CharLayout('e', KDFont::SmallFont),
+      VerticalOffsetLayout(
+          HorizontalLayout(exponentLayoutChildren, 4),
+          VerticalOffsetLayoutNode::Type::Superscript
+        )
     };
-    layout = new FractionLayout(
-       new CharLayout('c', KDText::FontSize::Small),
-       new HorizontalLayout(layoutChildren, 6, false),
-       false);
+    m_layout = FractionLayout(
+       CharLayout('c', KDFont::SmallFont),
+       HorizontalLayout(layoutChildren, 6)
+      );
   }
-  return layout;
+  return m_layout;
 }
 
 double LogisticModel::evaluate(double * modelCoefficients, double x) const {

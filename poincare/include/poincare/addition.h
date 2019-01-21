@@ -1,62 +1,91 @@
 #ifndef POINCARE_ADDITION_H
 #define POINCARE_ADDITION_H
 
-#include <poincare/dynamic_hierarchy.h>
+#include <poincare/approximation_helper.h>
+#include <poincare/n_ary_expression_node.h>
 #include <poincare/rational.h>
-#include <poincare/layout_engine.h>
-#include <poincare/approximation_engine.h>
 
 namespace Poincare {
 
-class Addition : public DynamicHierarchy {
-  using DynamicHierarchy::DynamicHierarchy;
-  friend class Logarithm;
-  friend class Multiplication;
-  friend class Subtraction;
-  friend class Power;
-  friend class Complex<float>;
-  friend class Complex<double>;
+class AdditionNode final : public NAryExpressionNode {
+  friend class Addition;
 public:
-  Type type() const override;
-  Expression * clone() const override;
-  int polynomialDegree(char symbolName) const override;
-  int privateGetPolynomialCoefficients(char symbolName, Expression * coefficients[]) const override;
-  /* Evaluation */
-  template<typename T> static std::complex<T> compute(const std::complex<T> c, const std::complex<T> d);
+  using NAryExpressionNode::NAryExpressionNode;
+
+  // Tree
+  size_t size() const override { return sizeof(AdditionNode); }
+#if POINCARE_TREE_LOG
+  virtual void logNodeName(std::ostream & stream) const override {
+    stream << "Addition";
+  }
+#endif
+
+  // ExpressionNode
+
+  // Properties
+  Type type() const override { return Type::Addition; }
+  int polynomialDegree(Context & context, const char * symbolName) const override;
+  int getPolynomialCoefficients(Context & context, const char * symbolName, Expression coefficients[]) const override;
+
+  // Evaluation
+  template<typename T> static Complex<T> compute(const std::complex<T> c, const std::complex<T> d) { return Complex<T>(c+d); }
   template<typename T> static MatrixComplex<T> computeOnMatrices(const MatrixComplex<T> m, const MatrixComplex<T> n) {
-    return ApproximationEngine::elementWiseOnComplexMatrices(m, n, compute<T>);
+    return ApproximationHelper::ElementWiseOnComplexMatrices(m, n, compute<T>);
   }
   template<typename T> static MatrixComplex<T> computeOnComplexAndMatrix(const std::complex<T> c, const MatrixComplex<T> m) {
-    return ApproximationEngine::elementWiseOnMatrixComplexAndComplex(m, c, compute<T>);
+    return ApproximationHelper::ElementWiseOnMatrixComplexAndComplex(m, c, compute<T>);
   }
 private:
-  /* Layout */
-  bool needParenthesisWithParent(const Expression * e) const override;
-  ExpressionLayout * createLayout(PrintFloat::Mode floatDisplayMode, int numberOfSignificantDigits) const override {
-    return LayoutEngine::createInfixLayout(this, floatDisplayMode, numberOfSignificantDigits, name());
-  }
-  int writeTextInBuffer(char * buffer, int bufferSize, PrintFloat::Mode floatDisplayMode, int numberOfSignificantDigits) const override {
-    return LayoutEngine::writeInfixExpressionTextInBuffer(this, buffer, bufferSize, floatDisplayMode, numberOfSignificantDigits, name());
-  }
-  static const char * name() { return "+"; }
+  // Layout
+  bool childNeedsParenthesis(const TreeNode * child) const override;
+  Layout createLayout(Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const override;
+  int serialize(char * buffer, int bufferSize, Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const override;
 
-  /* Simplification */
-  Expression * shallowReduce(Context& context, AngleUnit angleUnit) override;
-  Expression * shallowBeautify(Context & context, AngleUnit angleUnit) override;
-  Expression * factorizeOnCommonDenominator(Context & context, AngleUnit angleUnit);
-  void factorizeOperands(Expression * e1, Expression * e2, Context & context, AngleUnit angleUnit);
-  static const Rational RationalFactor(Expression * e);
-  static bool TermsHaveIdenticalNonRationalFactors(const Expression * e1, const Expression * e2);
+  // Simplification
+  Expression shallowReduce(Context & context, Preferences::AngleUnit angleUnit, bool replaceSymbols = true) override;
+  Expression shallowBeautify(Context & context, Preferences::AngleUnit angleUnit) override;
+
   /* Evaluation */
   template<typename T> static MatrixComplex<T> computeOnMatrixAndComplex(const MatrixComplex<T> m, const std::complex<T> c) {
-    return ApproximationEngine::elementWiseOnMatrixComplexAndComplex(m, c, compute<T>);
+    return ApproximationHelper::ElementWiseOnMatrixComplexAndComplex(m, c, compute<T>);
   }
-  Evaluation<float> * privateApproximate(SinglePrecision p, Context& context, AngleUnit angleUnit) const override {
-    return ApproximationEngine::mapReduce<float>(this, context, angleUnit, compute<float>, computeOnComplexAndMatrix<float>, computeOnMatrixAndComplex<float>, computeOnMatrices<float>);
+  Evaluation<float> approximate(SinglePrecision p, Context& context, Preferences::AngleUnit angleUnit) const override {
+    return ApproximationHelper::MapReduce<float>(this, context, angleUnit, compute<float>, computeOnComplexAndMatrix<float>, computeOnMatrixAndComplex<float>, computeOnMatrices<float>);
    }
-  Evaluation<double> * privateApproximate(DoublePrecision p, Context& context, AngleUnit angleUnit) const override {
-    return ApproximationEngine::mapReduce<double>(this, context, angleUnit, compute<double>, computeOnComplexAndMatrix<double>, computeOnMatrixAndComplex<double>, computeOnMatrices<double>);
+  Evaluation<double> approximate(DoublePrecision p, Context& context, Preferences::AngleUnit angleUnit) const override {
+    return ApproximationHelper::MapReduce<double>(this, context, angleUnit, compute<double>, computeOnComplexAndMatrix<double>, computeOnMatrixAndComplex<double>, computeOnMatrices<double>);
    }
+};
+
+class Addition final : public NAryExpression {
+public:
+  Addition(const AdditionNode * n) : NAryExpression(n) {}
+  Addition();
+  explicit Addition(Expression e1) : Addition() {
+    addChildAtIndexInPlace(e1, 0, 0);
+  }
+  Addition(Expression e1, Expression e2) : Addition() {
+    addChildAtIndexInPlace(e2, 0, 0);
+    addChildAtIndexInPlace(e1, 0, numberOfChildren());
+  }
+  Addition(Expression * children, size_t numberOfChildren) : Addition() {
+    for (size_t i = 0; i < numberOfChildren; i++) {
+      addChildAtIndexInPlace(children[i], i, i);
+    }
+  }
+  // Expression
+  Expression shallowReduce(Context & context, Preferences::AngleUnit angleUnit, bool replaceSymbols = true);
+  Expression shallowBeautify(Context & context, Preferences::AngleUnit angleUnit);
+  int getPolynomialCoefficients(Context & context, const char * symbolName, Expression coefficients[]) const;
+private:
+  static const Number NumeralFactor(const Expression & e);
+  static inline int NumberOfNonNumeralFactors(const Expression & e);
+  static inline const Expression FirstNonNumeralFactor(const Expression & e);
+
+  static bool TermsHaveIdenticalNonNumeralFactors(const Expression & e1, const Expression & e2);
+  Expression factorizeOnCommonDenominator(Context & context, Preferences::AngleUnit angleUnit);
+  void factorizeChildrenAtIndexesInPlace(int index1, int index2, Context & context, Preferences::AngleUnit angleUnit);
+  AdditionNode * node() const { return static_cast<AdditionNode *>(Expression::node()); }
 };
 
 }

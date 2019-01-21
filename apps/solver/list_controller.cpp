@@ -1,5 +1,6 @@
 #include "list_controller.h"
 #include "app.h"
+#include <poincare/char_layout.h>
 #include <assert.h>
 
 using namespace Shared;
@@ -10,13 +11,21 @@ ListController::ListController(Responder * parentResponder, EquationStore * equa
   ExpressionModelListController(parentResponder, I18n::Message::AddEquation),
   ButtonRowDelegate(nullptr, footer),
   m_equationStore(equationStore),
+  m_equationListView(this, this, this),
+  m_expressionCells{},
   m_resolveButton(this, equationStore->numberOfDefinedModels() > 1 ? I18n::Message::ResolveSystem : I18n::Message::ResolveEquation, Invocation([](void * context, void * sender) {
     ListController * list = (ListController *)context;
     list->resolveEquations();
-  }, this), KDText::FontSize::Large, Palette::PurpleBright),
+    return true;
+  }, this), KDFont::LargeFont, Palette::PurpleBright),
   m_modelsParameterController(this, equationStore, this),
   m_modelsStackController(nullptr, &m_modelsParameterController, KDColorWhite, Palette::PurpleDark, Palette::PurpleDark)
 {
+  m_addNewModel.setAlignment(0.3f, 0.5f); // (EquationListView::k_braceTotalWidth+k_expressionMargin) / (Ion::Display::Width-m_addNewModel.text().size()) = (30+5)/(320-200)
+  for (int i = 0; i < k_maxNumberOfRows; i++) {
+    m_expressionCells[i].setLeftMargin(EquationListView::k_braceTotalWidth+k_expressionMargin);
+    m_expressionCells[i].setEven(true);
+  }
 }
 
 int ListController::numberOfButtons(ButtonRowController::Position position) const {
@@ -45,9 +54,9 @@ HighlightCell * ListController::reusableCell(int index, int type) {
   assert(index < k_maxNumberOfRows);
   switch (type) {
     case 0:
-      return m_expressionCells[index];
+      return &m_expressionCells[index];
     case 1:
-      return m_addNewModel;
+      return &m_addNewModel;
     default:
       assert(false);
       return nullptr;
@@ -112,8 +121,15 @@ bool textRepresentsAnEquality(const char * text) {
   return false;
 }
 
+bool layoutRepresentsAnEquality(Poincare::Layout l) {
+  Poincare::Layout match = l.recursivelyMatches(
+      [](Poincare::Layout layout) {
+      return layout.isChar() && static_cast<Poincare::CharLayout &>(layout).character() == '='; });
+  return !match.isUninitialized();
+}
+
 bool ListController::textFieldDidReceiveEvent(TextField * textField, Ion::Events::Event event) {
-  if (textField->isEditing() && textField->textFieldShouldFinishEditing(event)) {
+  if (textField->isEditing() && textField->shouldFinishEditing(event)) {
     if (!textRepresentsAnEquality(textField->text())) {
       textField->handleEvent(Ion::Events::ShiftRight);
       textField->handleEventWithText("=0");
@@ -129,21 +145,18 @@ bool ListController::textFieldDidReceiveEvent(TextField * textField, Ion::Events
   return false;
 }
 
-bool ListController::expressionLayoutFieldDidReceiveEvent(ExpressionLayoutField * expressionLayoutField, Ion::Events::Event event) {
-  if (expressionLayoutField->isEditing() && expressionLayoutField->expressionLayoutFieldShouldFinishEditing(event)) {
-    char buffer[TextField::maxBufferSize()];
-    expressionLayoutField->writeTextInBuffer(buffer, TextField::maxBufferSize());
-    if (!textRepresentsAnEquality(buffer)) {
-      expressionLayoutField->handleEvent(Ion::Events::ShiftRight);
-      expressionLayoutField->handleEventWithText("=0");
-      expressionLayoutField->writeTextInBuffer(buffer, TextField::maxBufferSize());
-      if (!textRepresentsAnEquality(buffer)) {
+bool ListController::layoutFieldDidReceiveEvent(LayoutField * layoutField, Ion::Events::Event event) {
+  if (layoutField->isEditing() && layoutField->shouldFinishEditing(event)) {
+    if (!layoutRepresentsAnEquality(layoutField->layout())) {
+      layoutField->handleEvent(Ion::Events::ShiftRight);
+      layoutField->handleEventWithText("=0");
+      if (!layoutRepresentsAnEquality(layoutField->layout())) {
         app()->displayWarning(I18n::Message::RequireEquation);
         return true;
       }
     }
   }
-  if (Shared::ExpressionLayoutFieldDelegate::expressionLayoutFieldDidReceiveEvent(expressionLayoutField, event)) {
+  if (Shared::LayoutFieldDelegate::layoutFieldDidReceiveEvent(layoutField, event)) {
     return true;
   }
   return false;
@@ -154,7 +167,7 @@ bool ListController::textFieldDidFinishEditing(TextField * textField, const char
   return true;
 }
 
-bool ListController::expressionLayoutFieldDidFinishEditing(ExpressionLayoutField * expressionLayoutField, Poincare::ExpressionLayout * layout, Ion::Events::Event event) {
+bool ListController::layoutFieldDidFinishEditing(LayoutField * layoutField, Poincare::Layout layout, Ion::Events::Event event) {
   reloadButtonMessage();
   return true;
 }
@@ -208,35 +221,13 @@ bool ListController::removeModelRow(ExpressionModel * model) {
 }
 
 void ListController::reloadBrace() {
-  EquationListView * listView = static_cast<EquationListView *>(view());
   EquationListView::BraceStyle braceStyle = m_equationStore->numberOfModels() <= 1 ? EquationListView::BraceStyle::None : (m_equationStore->numberOfModels() == m_equationStore->maxNumberOfModels() ? EquationListView::BraceStyle::Full : EquationListView::BraceStyle::OneRowShort);
-  listView->setBraceStyle(braceStyle);
-  listView->layoutSubviews();
+  m_equationListView.setBraceStyle(braceStyle);
+  m_equationListView.layoutSubviews();
 }
 
 SelectableTableView * ListController::selectableTableView() {
-  return static_cast<EquationListView *>(view())->selectableTableView();
-}
-
-View * ListController::loadView() {
-  loadAddModelCell();
-  m_addNewModel->setAlignment(0.3f, 0.5f); // (EquationListView::k_braceTotalWidth+k_expressionMargin) / (Ion::Display::Width-m_addNewModel.text().size()) = (30+5)/(320-200)
-  for (int i = 0; i < k_maxNumberOfRows; i++) {
-    m_expressionCells[i] = new EvenOddExpressionCell();
-    m_expressionCells[i]->setLeftMargin(EquationListView::k_braceTotalWidth+k_expressionMargin);
-    m_expressionCells[i]->setEven(true);
-  }
-  EquationListView * listView = new EquationListView(this, this, this);
-  return listView;
-}
-
-void ListController::unloadView(View * view) {
-  unloadAddModelCell();
-  for (int i = 0; i < k_maxNumberOfRows; i++) {
-    delete m_expressionCells[i];
-    m_expressionCells[i] = nullptr;
-  }
-  delete view;
+  return m_equationListView.selectableTableView();
 }
 
 Shared::TextFieldDelegateApp * ListController::textFieldDelegateApp() {

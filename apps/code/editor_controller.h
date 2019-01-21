@@ -4,16 +4,18 @@
 #include <escher.h>
 #include "script.h"
 #include "editor_view.h"
+#include "variable_box_controller.h"
+#include "../shared/input_event_handler_delegate.h"
 
 namespace Code {
 
 class MenuController;
 class ScriptParameterController;
+class App;
 
-class EditorController : public ViewController, public TextAreaDelegate {
+class EditorController : public ViewController, public TextAreaDelegate, public Shared::InputEventHandlerDelegate {
 public:
-  EditorController(MenuController * menuController);
-  ~EditorController();
+  EditorController(MenuController * menuController, App * pythonDelegate);
   void setScript(Script script);
 
   /* ViewController */
@@ -26,13 +28,20 @@ public:
 
   /* TextAreaDelegate */
   bool textAreaDidReceiveEvent(TextArea * textArea, Ion::Events::Event event) override;
-  Toolbox * toolboxForTextInput(TextInput * textInput) override;
+
+  /* InputEventHandlerDelegate */
+  VariableBoxController * variableBoxForInputEventHandler(InputEventHandler * textInput) override;
 
 private:
+  Shared::InputEventHandlerDelegateApp * inputEventHandlerDelegateApp() override;
   static constexpr int k_indentationSpacesNumber = 2;
   StackViewController * stackController();
+  void saveScript();
   EditorView m_editorView;
-  char * m_areaBuffer;
+  /* m_areaBuffer first character is dedicated to the importation status.
+   * Thereby, we avoid wasteful copy while adding the Script to the storage
+   * (in order to add the importation status char before the areaBuffer). */
+  char m_areaBuffer[Ion::Storage::k_storageSize]; // this could be slightly optimize
   Script m_script;
   MenuController * m_menuController;
 };

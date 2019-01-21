@@ -7,14 +7,14 @@ namespace Calculation {
 
 class CalculationStore {
 public:
-  CalculationStore();
+  CalculationStore() : m_startIndex(0) {}
   Calculation * calculationAtIndex(int i);
   Calculation * push(const char * text, Poincare::Context * context);
   void deleteCalculationAtIndex(int i);
   void deleteAll();
   int numberOfCalculations();
   void tidy();
-  Poincare::Expression * ansExpression(Poincare::Context * context);
+  Poincare::Expression ansExpression(Poincare::Context * context);
   static constexpr int k_maxNumberOfCalculations = 10;
 private:
   int m_startIndex;

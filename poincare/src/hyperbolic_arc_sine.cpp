@@ -1,38 +1,22 @@
 #include <poincare/hyperbolic_arc_sine.h>
-#include <poincare/simplification_engine.h>
-#include <poincare/trigonometry.h>
-extern "C" {
-#include <assert.h>
-}
+#include <poincare/complex.h>
+#include <poincare/layout_helper.h>
+#include <poincare/serialization_helper.h>
 #include <cmath>
 
 namespace Poincare {
 
-Expression::Type HyperbolicArcSine::type() const {
-  return Type::HyperbolicArcSine;
-}
+constexpr Expression::FunctionHelper HyperbolicArcSine::s_functionHelper;
 
-Expression * HyperbolicArcSine::clone() const {
-  HyperbolicArcSine * a = new HyperbolicArcSine(m_operands, true);
-  return a;
+Layout HyperbolicArcSineNode::createLayout(Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const {
+  return LayoutHelper::Prefix(HyperbolicArcSine(this), floatDisplayMode, numberOfSignificantDigits, HyperbolicArcSine::s_functionHelper.name());
 }
-
-Expression * HyperbolicArcSine::shallowReduce(Context& context, AngleUnit angleUnit) {
-  Expression * e = Expression::shallowReduce(context, angleUnit);
-  if (e != this) {
-    return e;
-  }
-#if MATRIX_EXACT_REDUCING
-  Expression * op = editableOperand(0);
-  if (op->type() == Type::Matrix) {
-    return SimplificationEngine::map(this, context, angleUnit);
-  }
-#endif
-  return this;
+int HyperbolicArcSineNode::serialize(char * buffer, int bufferSize, Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const {
+  return SerializationHelper::Prefix(this, buffer, bufferSize, floatDisplayMode, numberOfSignificantDigits, HyperbolicArcSine::s_functionHelper.name());
 }
 
 template<typename T>
-std::complex<T> HyperbolicArcSine::computeOnComplex(const std::complex<T> c, AngleUnit angleUnit) {
+Complex<T> HyperbolicArcSineNode::computeOnComplex(const std::complex<T> c, Preferences::AngleUnit angleUnit) {
   std::complex<T> result = std::asinh(c);
   /* asinh has a branch cut on ]-inf*i, -i[U]i, +inf*i[: it is then multivalued
    * on this cut. We followed the convention chosen by the lib c++ of llvm on
@@ -42,7 +26,10 @@ std::complex<T> HyperbolicArcSine::computeOnComplex(const std::complex<T> c, Ang
   if (c.real() == 0 && c.imag() < 1) {
     result.real(-result.real()); // other side of the cut
   }
-  return Trigonometry::RoundToMeaningfulDigits(result);
+  return Complex<T>(Trigonometry::RoundToMeaningfulDigits(result, c));
 }
+
+template Complex<float> Poincare::HyperbolicArcSineNode::computeOnComplex<float>(std::complex<float>, Preferences::AngleUnit);
+template Complex<double> Poincare::HyperbolicArcSineNode::computeOnComplex<double>(std::complex<double>, Preferences::AngleUnit);
 
 }
