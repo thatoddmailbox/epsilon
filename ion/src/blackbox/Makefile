@@ -9,9 +9,11 @@ objs += $(addprefix ion/src/shared/, \
   console_line.o \
   console_stdio.o \
   crc32.o \
+  crc32_padded.o \
   events.o \
   power.o \
   random.o \
+  timing.o \
   dummy/backlight.o \
   dummy/battery.o \
   dummy/events_modifier.o \
@@ -19,6 +21,7 @@ objs += $(addprefix ion/src/shared/, \
   dummy/led.o \
   dummy/keyboard.o \
   dummy/serial_number.o \
+  dummy/stack.o \
   dummy/usb.o \
 )
 

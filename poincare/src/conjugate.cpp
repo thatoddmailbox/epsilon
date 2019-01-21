@@ -1,48 +1,51 @@
 #include <poincare/conjugate.h>
-#include <poincare/simplification_engine.h>
-#include "layout/conjugate_layout.h"
-
-extern "C" {
+#include <poincare/conjugate_layout.h>
+#include <poincare/serialization_helper.h>
+#include <poincare/simplification_helper.h>
 #include <assert.h>
-}
 #include <cmath>
 
 namespace Poincare {
 
-Expression::Type Conjugate::type() const {
-  return Type::Conjugate;
+constexpr Expression::FunctionHelper Conjugate::s_functionHelper;
+
+int ConjugateNode::numberOfChildren() const { return Conjugate::s_functionHelper.numberOfChildren(); }
+
+Layout ConjugateNode::createLayout(Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const {
+  return ConjugateLayout(childAtIndex(0)->createLayout(floatDisplayMode, numberOfSignificantDigits));
 }
 
-Expression * Conjugate::clone() const {
-  Conjugate * a = new Conjugate(m_operands, true);
-  return a;
+int ConjugateNode::serialize(char * buffer, int bufferSize, Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const {
+  return SerializationHelper::Prefix(this, buffer, bufferSize, floatDisplayMode, numberOfSignificantDigits, Conjugate::s_functionHelper.name());
 }
 
-ExpressionLayout * Conjugate::createLayout(PrintFloat::Mode floatDisplayMode, int numberOfSignificantDigits) const {
-  return new ConjugateLayout(operand(0)->createLayout(floatDisplayMode, numberOfSignificantDigits), false);
-}
-
-Expression * Conjugate::shallowReduce(Context& context, AngleUnit angleUnit) {
-  Expression * e = Expression::shallowReduce(context, angleUnit);
-  if (e != this) {
-    return e;
-  }
-  Expression * op = editableOperand(0);
-#if MATRIX_EXACT_REDUCING
-  if (op->type() == Type::Matrix) {
-    return SimplificationEngine::map(this, context, angleUnit);
-  }
-#endif
-  if (op->type() == Type::Rational) {
-    return replaceWith(op, true);
-  }
-  return this;
+Expression ConjugateNode::shallowReduce(Context & context, Preferences::AngleUnit angleUnit, bool replaceSymbols) {
+  return Conjugate(this).shallowReduce(context, angleUnit, replaceSymbols);
 }
 
 template<typename T>
-std::complex<T> Conjugate::computeOnComplex(const std::complex<T> c, AngleUnit angleUnit) {
-  return std::conj(c);
+Complex<T> ConjugateNode::computeOnComplex(const std::complex<T> c, Preferences::AngleUnit angleUnit) {
+  return Complex<T>(std::conj(c));
+}
+
+Expression Conjugate::shallowReduce(Context & context, Preferences::AngleUnit angleUnit, bool replaceSymbols) {
+  {
+    Expression e = Expression::defaultShallowReduce(context, angleUnit);
+    if (e.isUndefined()) {
+      return e;
+    }
+  }
+  Expression c = childAtIndex(0);
+#if MATRIX_EXACT_REDUCING
+  if (c.type() == ExpressionNode::Type::Matrix) {
+    return SimplificationHelper::Map(*this, context, angleUnit);
+  }
+#endif
+  if (c.type() == ExpressionNode::Type::Rational) {
+    replaceWithInPlace(c);
+    return c;
+  }
+  return *this;
 }
 
 }
-

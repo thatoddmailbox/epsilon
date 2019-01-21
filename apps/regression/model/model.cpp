@@ -11,13 +11,15 @@ using namespace Shared;
 
 namespace Regression {
 
+void Model::tidy() {
+  m_layout = Layout();
+}
+
 double Model::levelSet(double * modelCoefficients, double xMin, double step, double xMax, double y, Poincare::Context * context) {
-  Expression * yExpression = static_cast<Expression *>(new Decimal(y));
+  Expression yExpression = Number::DecimalNumber(y);
   PoincareHelpers::Simplify(&yExpression, *context);
-  Expression * modelExpression = simplifiedExpression(modelCoefficients, context);
-  double result = modelExpression->nextIntersection('x', xMin, step, xMax, *context, Preferences::sharedPreferences()->angleUnit(), yExpression).abscissa;
-  delete modelExpression;
-  delete yExpression;
+  Expression modelExpression = simplifiedExpression(modelCoefficients, context);
+  double result = modelExpression.nextIntersection("x", xMin, step, xMax, *context, Preferences::sharedPreferences()->angleUnit(), yExpression).abscissa;
   return result;
 }
 

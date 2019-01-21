@@ -9,70 +9,38 @@ namespace Shared {
 
 ExpressionFieldDelegateApp::ExpressionFieldDelegateApp(Container * container, Snapshot * snapshot, ViewController * rootViewController) :
   TextFieldDelegateApp(container, snapshot, rootViewController),
-  ExpressionLayoutFieldDelegate()
+  LayoutFieldDelegate()
 {
 }
 
-char ExpressionFieldDelegateApp::privateXNT(ExpressionLayoutField * expressionLayoutField) {
-  char xntCharFromLayout = expressionLayoutField->XNTChar();
-  if (xntCharFromLayout != Ion::Charset::Empty) {
-    return xntCharFromLayout;
-  }
-  return XNT()[0];
+bool ExpressionFieldDelegateApp::layoutFieldShouldFinishEditing(LayoutField * layoutField, Ion::Events::Event event) {
+  return isFinishingEvent(event);
 }
 
-bool ExpressionFieldDelegateApp::expressionLayoutFieldShouldFinishEditing(ExpressionLayoutField * expressionLayoutField, Ion::Events::Event event) {
-  return event == Ion::Events::OK || event == Ion::Events::EXE;
-}
-
-bool ExpressionFieldDelegateApp::expressionLayoutFieldDidReceiveEvent(ExpressionLayoutField * expressionLayoutField, Ion::Events::Event event) {
-  if (expressionLayoutField->isEditing() && expressionLayoutField->expressionLayoutFieldShouldFinishEditing(event)) {
-    if (!expressionLayoutField->hasText()) {
-      expressionLayoutField->app()->displayWarning(I18n::Message::SyntaxError);
+bool ExpressionFieldDelegateApp::layoutFieldDidReceiveEvent(LayoutField * layoutField, Ion::Events::Event event) {
+  if (layoutField->isEditing() && layoutField->shouldFinishEditing(event)) {
+    if (!layoutField->hasText()) {
+      layoutField->app()->displayWarning(I18n::Message::SyntaxError);
       return true;
     }
     char buffer[TextField::maxBufferSize()];
     int bufferSize = TextField::maxBufferSize();
-    int length = expressionLayoutField->writeTextInBuffer(buffer, bufferSize);
-    Expression * exp = Expression::parse(buffer);
-    if (exp != nullptr) {
-      delete exp;
-    }
+    int length = layoutField->layout().serializeForParsing(buffer, bufferSize);
     if (length >= bufferSize-1) {
       /* If the buffer is totally full, it is VERY likely that writeTextInBuffer
        * escaped before printing utterly the expression. */
       displayWarning(I18n::Message::SyntaxError);
       return true;
     }
-    if (exp == nullptr) {
-      expressionLayoutField->app()->displayWarning(I18n::Message::SyntaxError);
+    if (!isAcceptableText(buffer)) {
+      displayWarning(I18n::Message::SyntaxError);
       return true;
     }
   }
-  if (event == Ion::Events::Var) {
-    if (!expressionLayoutField->isEditing()) {
-      expressionLayoutField->setEditing(true);
-    }
-    AppsContainer * appsContainer = (AppsContainer *)expressionLayoutField->app()->container();
-    VariableBoxController * variableBoxController = appsContainer->variableBoxController();
-    variableBoxController->setSender(expressionLayoutField);
-    expressionLayoutField->app()->displayModalViewController(variableBoxController, 0.f, 0.f, Metric::PopUpTopMargin, Metric::PopUpLeftMargin, 0, Metric::PopUpRightMargin);
+  if (fieldDidReceiveEvent(layoutField, layoutField, event)) {
     return true;
   }
-  if (event == Ion::Events::XNT) {
-    if (!expressionLayoutField->isEditing()) {
-      expressionLayoutField->setEditing(true);
-    }
-    const char xnt[2] = {privateXNT(expressionLayoutField), 0};
-    return expressionLayoutField->handleEventWithText(xnt);
-  }
   return false;
-}
-
-Toolbox * ExpressionFieldDelegateApp::toolboxForExpressionLayoutField(ExpressionLayoutField * expressionLayoutField) {
-  Toolbox * toolbox = container()->mathToolbox();
-  toolbox->setSender(expressionLayoutField);
-  return toolbox;
 }
 
 }

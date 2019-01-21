@@ -2,20 +2,18 @@
 #define SETTINGS_MAIN_CONTROLLER_H
 
 #include <escher.h>
-#include "sub_controller.h"
 #include "settings_message_tree.h"
-#include "language_controller.h"
+#include "sub_menu/about_controller.h"
+#include "sub_menu/display_mode_controller.h"
+#include "sub_menu/exam_mode_controller.h"
+#include "sub_menu/language_controller.h"
+#include "sub_menu/preferences_controller.h"
 
 namespace Settings {
 
 class MainController : public ViewController, public ListViewDataSource, public SelectableTableViewDataSource {
 public:
-  MainController(Responder * parentResponder);
-  ~MainController();
-  MainController(const MainController& other) = delete;
-  MainController(MainController&& other) = delete;
-  MainController& operator=(const MainController& other) = delete;
-  MainController& operator=(MainController&& other) = delete;
+  MainController(Responder * parentResponder, InputEventHandlerDelegate * inputEventHandlerDelegate);
   View * view() override;
   bool handleEvent(Ion::Events::Event event) override;
   void didBecomeFirstResponder() override;
@@ -30,21 +28,23 @@ public:
   void viewWillAppear() override;
 private:
   StackViewController * stackController() const;
-#if EPSILON_SOFTWARE_UPDATE_PROMPT
+#ifdef EPSILON_BOOT_PROMPT
   constexpr static int k_totalNumberOfCell = 9;
-  MessageTableCellWithSwitch m_updateCell;
+  MessageTableCellWithSwitch m_popUpCell;
 #else
   constexpr static int k_totalNumberOfCell = 8;
 #endif
-  constexpr static int k_numberOfSimpleChevronCells = 6;
+  constexpr static int k_numberOfSimpleChevronCells = 7;
   MessageTableCellWithChevronAndMessage m_cells[k_numberOfSimpleChevronCells];
-  MessageTableCellWithChevronAndExpression m_complexFormatCell;
   MessageTableCellWithGauge m_brightnessCell;
-  Poincare::ExpressionLayout * m_complexFormatLayout;
   SelectableTableView m_selectableTableView;
   MessageTree * m_messageTreeModel;
-  SubController m_subController;
+  PreferencesController m_preferencesController;
+  DisplayModeController m_displayModeController;
   LanguageController m_languageController;
+  ExamModeController m_examModeController;
+  AboutController m_aboutController;
+
 };
 
 }

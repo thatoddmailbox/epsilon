@@ -34,10 +34,10 @@ protected:
     void drawRect(KDContext * ctx, KDRect rect) const override;
     virtual KDSize minimalSizeForOptimalDisplay() const override;
     const char * text() const override {
-      return m_scriptStore->scriptAtIndex(m_scriptNode->scriptIndex()).name();
+      return m_scriptStore->scriptAtIndex(m_scriptNode->scriptIndex()).fullName();
     }
   private:
-    constexpr static KDText::FontSize k_fontSize = KDText::FontSize::Small;
+    constexpr static const KDFont * k_font = KDFont::SmallFont;
     constexpr static KDCoordinate k_verticalMargin = 7;
     ScriptNode * m_scriptNode;
     ScriptStore * m_scriptStore;

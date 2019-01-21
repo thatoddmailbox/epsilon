@@ -1,16 +1,16 @@
 #ifndef CODE_EDITOR_VIEW_H
 #define CODE_EDITOR_VIEW_H
 
-#include <escher/view.h>
+#include <escher.h>
 #include "python_text_area.h"
 
 namespace Code {
 
 class EditorView : public Responder, public View, public ScrollViewDelegate {
 public:
-  EditorView(Responder * parentResponder);
-  void setTextAreaDelegate(TextAreaDelegate * delegate) {
-    m_textArea.setDelegate(delegate);
+  EditorView(Responder * parentResponder, App * pythonDelegate);
+  void setTextAreaDelegates(InputEventHandlerDelegate * inputEventHandlerDelegate, TextAreaDelegate * delegate) {
+    m_textArea.setDelegates(inputEventHandlerDelegate, delegate);
   }
   const char * text() const { return m_textArea.text(); }
   void setText(char * textBuffer, size_t textBufferSize) {
@@ -30,13 +30,13 @@ private:
 
   class GutterView : public View {
   public:
-    GutterView(KDText::FontSize fontSize);
+    GutterView(const KDFont * font);
     void drawRect(KDContext * ctx, KDRect rect) const override;
     void setOffset(KDCoordinate offset);
     KDSize minimalSizeForOptimalDisplay() const override;
   private:
     static constexpr KDCoordinate k_margin = 2;
-    KDText::FontSize m_fontSize;
+    const KDFont * m_font;
     KDCoordinate m_offset;
   };
 

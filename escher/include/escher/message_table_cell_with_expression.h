@@ -6,10 +6,10 @@
 
 class MessageTableCellWithExpression : public MessageTableCell {
 public:
-  MessageTableCellWithExpression(I18n::Message message = (I18n::Message)0, KDText::FontSize size = KDText::FontSize::Small);
+  MessageTableCellWithExpression(I18n::Message message = (I18n::Message)0, const KDFont * font = KDFont::SmallFont);
   View * accessoryView() const override;
   void setHighlighted(bool highlight) override;
-  void setExpressionLayout(Poincare::ExpressionLayout * expressionLayout);
+  void setLayout(Poincare::Layout layout);
 private:
   ExpressionView m_subtitleView;
 };

@@ -1,10 +1,10 @@
 #include "sequence.h"
 #include "sequence_store.h"
 #include "cache_context.h"
-#include <poincare/layout_engine.h>
-#include "../../poincare/src/layout/char_layout.h"
-#include "../../poincare/src/layout/horizontal_layout.h"
-#include "../../poincare/src/layout/vertical_offset_layout.h"
+#include <poincare/layout_helper.h>
+#include <poincare/char_layout.h>
+#include <poincare/vertical_offset_layout.h>
+#include <poincare/integer.h>
 #include "../shared/poincare_helpers.h"
 #include <string.h>
 #include <cmath>
@@ -19,74 +19,24 @@ Sequence::Sequence(const char * text, KDColor color) :
   m_type(Type::Explicit),
   m_firstInitialConditionText(),
   m_secondInitialConditionText(),
-  m_firstInitialConditionExpression(nullptr),
-  m_secondInitialConditionExpression(nullptr),
-  m_firstInitialConditionLayout(nullptr),
-  m_secondInitialConditionLayout(nullptr),
-  m_nameLayout(nullptr),
-  m_definitionName(nullptr),
-  m_firstInitialConditionName(nullptr),
-  m_secondInitialConditionName(nullptr),
+  m_firstInitialConditionExpression(),
+  m_secondInitialConditionExpression(),
+  m_firstInitialConditionLayout(),
+  m_secondInitialConditionLayout(),
+  m_nameLayout(),
+  m_definitionName(),
+  m_firstInitialConditionName(),
+  m_secondInitialConditionName(),
   m_initialRank(0)
 {
 }
 
-Sequence::~Sequence() {
-  if (m_firstInitialConditionLayout != nullptr) {
-    delete m_firstInitialConditionLayout;
-    m_firstInitialConditionLayout = nullptr;
-  }
-  if (m_secondInitialConditionLayout != nullptr) {
-    delete m_secondInitialConditionLayout;
-    m_secondInitialConditionLayout = nullptr;
-  }
-  if (m_firstInitialConditionExpression != nullptr) {
-    delete m_firstInitialConditionExpression;
-    m_firstInitialConditionExpression = nullptr;
-  }
-  if (m_secondInitialConditionExpression != nullptr) {
-    delete m_secondInitialConditionExpression;
-    m_secondInitialConditionExpression = nullptr;
-  }
-  if (m_nameLayout != nullptr) {
-    delete m_nameLayout;
-    m_nameLayout = nullptr;
-  }
-  if (m_definitionName != nullptr) {
-    delete m_definitionName;
-    m_definitionName = nullptr;
-  }
-  if (m_firstInitialConditionName != nullptr) {
-    delete m_firstInitialConditionName;
-    m_firstInitialConditionName = nullptr;
-  }
-  if (m_secondInitialConditionName != nullptr) {
-    delete m_secondInitialConditionName;
-    m_secondInitialConditionName = nullptr;
-  }
-}
-
-Sequence& Sequence::operator=(const Sequence& other) {
-  /* We temporarely store other's required features to be able to access them
-   * after setType (which erase all contents and index buffer) even in case of
-   * self assignement */
-  const char * contentText = other.text();
-  const char * firstInitialText = other.m_firstInitialConditionText;
-  const char * secondInitialText = other.m_secondInitialConditionText;
-  Function::operator=(other);
-  setType(other.m_type);
-  setInitialRank(other.m_initialRank);
-  setContent(contentText);
-  setFirstInitialConditionContent(firstInitialText);
-  setSecondInitialConditionContent(secondInitialText);
-  return *this;
-}
-
 uint32_t Sequence::checksum() {
-  char data[k_dataLengthInBytes/sizeof(char)] = {};
-  strlcpy(data, text(), TextField::maxBufferSize());
-  strlcpy(data+TextField::maxBufferSize(), firstInitialConditionText(), TextField::maxBufferSize());
-  strlcpy(data+2*TextField::maxBufferSize(), secondInitialConditionText(), TextField::maxBufferSize());
+  constexpr size_t dataSize = k_dataLengthInBytes/sizeof(char);
+  char data[dataSize] = {};
+  strlcpy(data, text(), dataSize);
+  strlcpy(data+TextField::maxBufferSize(), firstInitialConditionText(), dataSize - TextField::maxBufferSize());
+  strlcpy(data+2*TextField::maxBufferSize(), secondInitialConditionText(), dataSize - 2*TextField::maxBufferSize());
   int * intAdress = (int *)(&data[3*TextField::maxBufferSize()]);
   *intAdress = m_initialRank;
   data[k_dataLengthInBytes-3] = (char)m_type;
@@ -140,47 +90,39 @@ void Sequence::setType(Type type) {
 
 void Sequence::setInitialRank(int rank) {
   m_initialRank = rank;
-  if (m_firstInitialConditionName != nullptr) {
-    delete m_firstInitialConditionName;
-    m_firstInitialConditionName = nullptr;
-  }
-  if (m_secondInitialConditionName != nullptr) {
-    delete m_secondInitialConditionName;
-    m_secondInitialConditionName = nullptr;
-  }
+  m_firstInitialConditionName = Layout();
+  m_secondInitialConditionName = Layout();
 }
 
-Poincare::Expression * Sequence::firstInitialConditionExpression(Context * context) const {
-  if (m_firstInitialConditionExpression == nullptr) {
+Poincare::Expression Sequence::firstInitialConditionExpression(Context * context) const {
+  if (m_firstInitialConditionExpression.isUninitialized()) {
     m_firstInitialConditionExpression = PoincareHelpers::ParseAndSimplify(m_firstInitialConditionText, *context);
   }
   return m_firstInitialConditionExpression;
 }
 
-Poincare::Expression * Sequence::secondInitialConditionExpression(Context * context) const {
-  if (m_secondInitialConditionExpression == nullptr) {
+Poincare::Expression Sequence::secondInitialConditionExpression(Context * context) const {
+  if (m_secondInitialConditionExpression.isUninitialized()) {
     m_secondInitialConditionExpression = PoincareHelpers::ParseAndSimplify(m_secondInitialConditionText, *context);
   }
   return m_secondInitialConditionExpression;
 }
 
-Poincare::ExpressionLayout * Sequence::firstInitialConditionLayout() {
-  if (m_firstInitialConditionLayout == nullptr) {
-    Expression * nonSimplifedExpression = Expression::parse(m_firstInitialConditionText);
-    if (nonSimplifedExpression) {
+Poincare::Layout Sequence::firstInitialConditionLayout() {
+  if (m_firstInitialConditionLayout.isUninitialized()) {
+    Expression nonSimplifedExpression = Expression::Parse(m_firstInitialConditionText);
+    if (!nonSimplifedExpression.isUninitialized()) {
       m_firstInitialConditionLayout = PoincareHelpers::CreateLayout(nonSimplifedExpression);
-      delete nonSimplifedExpression;
     }
   }
   return m_firstInitialConditionLayout;
 }
 
-Poincare::ExpressionLayout * Sequence::secondInitialConditionLayout() {
-  if (m_secondInitialConditionLayout == nullptr) {
-    Expression * nonSimplifedExpression = Expression::parse(m_secondInitialConditionText);
-    if (nonSimplifedExpression) {
+Poincare::Layout Sequence::secondInitialConditionLayout() {
+  if (m_secondInitialConditionLayout.isUninitialized()) {
+    Expression nonSimplifedExpression = Expression::Parse(m_secondInitialConditionText);
+    if (!nonSimplifedExpression.isUninitialized()) {
       m_secondInitialConditionLayout = PoincareHelpers::CreateLayout(nonSimplifedExpression);
-      delete nonSimplifedExpression;
     }
   }
   return m_secondInitialConditionLayout;
@@ -188,96 +130,80 @@ Poincare::ExpressionLayout * Sequence::secondInitialConditionLayout() {
 
 void Sequence::setFirstInitialConditionContent(const char * c) {
   strlcpy(m_firstInitialConditionText, c, sizeof(m_firstInitialConditionText));
-  if (m_firstInitialConditionExpression != nullptr) {
-    delete m_firstInitialConditionExpression;
-    m_firstInitialConditionExpression = nullptr;
-  }
-  if (m_firstInitialConditionLayout != nullptr) {
-    delete m_firstInitialConditionLayout;
-    m_firstInitialConditionLayout = nullptr;
-  }
+  m_firstInitialConditionExpression = Expression();
+  m_firstInitialConditionLayout = Layout();
 }
 
 void Sequence::setSecondInitialConditionContent(const char * c) {
   strlcpy(m_secondInitialConditionText, c, sizeof(m_secondInitialConditionText));
-  if (m_secondInitialConditionExpression != nullptr) {
-    delete m_secondInitialConditionExpression;
-    m_secondInitialConditionExpression = nullptr;
-  }
-  if (m_secondInitialConditionLayout != nullptr) {
-    delete m_secondInitialConditionLayout;
-    m_secondInitialConditionLayout = nullptr;
-  }
-}
-
-char Sequence::symbol() const {
-  return 'n';
+  m_secondInitialConditionExpression = Expression();
+  m_secondInitialConditionLayout = Layout();
 }
 
 int Sequence::numberOfElements() {
   return (int)m_type + 1;
 }
 
-Poincare::ExpressionLayout * Sequence::nameLayout() {
-  if (m_nameLayout == nullptr) {
-    m_nameLayout = new HorizontalLayout(
-        new CharLayout(name()[0], KDText::FontSize::Small),
-        new VerticalOffsetLayout(new CharLayout('n', KDText::FontSize::Small), VerticalOffsetLayout::Type::Subscript, false),
-        false);
+Poincare::Layout Sequence::nameLayout() {
+  if (m_nameLayout.isUninitialized()) {
+    m_nameLayout = HorizontalLayout(
+        CharLayout(name()[0], KDFont::SmallFont),
+        VerticalOffsetLayout(CharLayout('n', KDFont::SmallFont), VerticalOffsetLayoutNode::Type::Subscript)
+      );
   }
   return m_nameLayout;
 }
 
-Poincare::ExpressionLayout * Sequence::definitionName() {
-  if (m_definitionName == nullptr) {
+Poincare::Layout Sequence::definitionName() {
+  if (m_definitionName.isUninitialized()) {
     if (m_type == Type::Explicit) {
-      m_definitionName = new HorizontalLayout(
-        new CharLayout(name()[0], KDText::FontSize::Large),
-        new VerticalOffsetLayout(LayoutEngine::createStringLayout("n", 1, KDText::FontSize::Large), VerticalOffsetLayout::Type::Subscript, false),
-        false);
+      m_definitionName = HorizontalLayout(
+        CharLayout(name()[0], KDFont::LargeFont),
+        VerticalOffsetLayout(LayoutHelper::String("n", 1, KDFont::LargeFont), VerticalOffsetLayoutNode::Type::Subscript)
+      );
     }
     if (m_type == Type::SingleRecurrence) {
-      m_definitionName = new HorizontalLayout(
-        new CharLayout(name()[0], KDText::FontSize::Large),
-        new VerticalOffsetLayout(LayoutEngine::createStringLayout("n+1", 3, KDText::FontSize::Large), VerticalOffsetLayout::Type::Subscript, false),
-        false);
+      m_definitionName = HorizontalLayout(
+        CharLayout(name()[0], KDFont::LargeFont),
+        VerticalOffsetLayout(LayoutHelper::String("n+1", 3, KDFont::LargeFont), VerticalOffsetLayoutNode::Type::Subscript)
+      );
     }
     if (m_type == Type::DoubleRecurrence) {
-      m_definitionName = new HorizontalLayout(
-        new CharLayout(name()[0], KDText::FontSize::Large),
-        new VerticalOffsetLayout(LayoutEngine::createStringLayout("n+2", 3, KDText::FontSize::Large), VerticalOffsetLayout::Type::Subscript, false),
-        false);
+      m_definitionName = HorizontalLayout(
+        CharLayout(name()[0], KDFont::LargeFont),
+        VerticalOffsetLayout(LayoutHelper::String("n+2", 3, KDFont::LargeFont), VerticalOffsetLayoutNode::Type::Subscript)
+      );
     }
   }
   return m_definitionName;
 }
 
-Poincare::ExpressionLayout * Sequence::firstInitialConditionName() {
+Poincare::Layout Sequence::firstInitialConditionName() {
   char buffer[k_initialRankNumberOfDigits+1];
-  Integer(m_initialRank).writeTextInBuffer(buffer, k_initialRankNumberOfDigits+1);
-  if (m_firstInitialConditionName == nullptr
+  Integer(m_initialRank).serialize(buffer, k_initialRankNumberOfDigits+1);
+  if (m_firstInitialConditionName.isUninitialized()
       && (m_type == Type::SingleRecurrence
        || m_type == Type::DoubleRecurrence))
   {
-    ExpressionLayout * indexLayout = LayoutEngine::createStringLayout(buffer, strlen(buffer), KDText::FontSize::Large);
-    m_firstInitialConditionName = new HorizontalLayout(
-        new CharLayout(name()[0], KDText::FontSize::Large),
-        new VerticalOffsetLayout(indexLayout, VerticalOffsetLayout::Type::Subscript, false),
-        false);
+    Layout indexLayout = LayoutHelper::String(buffer, strlen(buffer), KDFont::LargeFont);
+    m_firstInitialConditionName = HorizontalLayout(
+        CharLayout(name()[0], KDFont::LargeFont),
+        VerticalOffsetLayout(indexLayout, VerticalOffsetLayoutNode::Type::Subscript)
+      );
   }
   return m_firstInitialConditionName;
 }
 
-Poincare::ExpressionLayout * Sequence::secondInitialConditionName() {
+Poincare::Layout Sequence::secondInitialConditionName() {
   char buffer[k_initialRankNumberOfDigits+1];
-  Integer(m_initialRank+1).writeTextInBuffer(buffer, k_initialRankNumberOfDigits+1);
-  if (m_secondInitialConditionName == nullptr) {
+  Integer(m_initialRank+1).serialize(buffer, k_initialRankNumberOfDigits+1);
+  if (m_secondInitialConditionName.isUninitialized()) {
     if (m_type == Type::DoubleRecurrence) {
-      ExpressionLayout * indexLayout = LayoutEngine::createStringLayout(buffer, strlen(buffer), KDText::FontSize::Large);
-      m_secondInitialConditionName = new HorizontalLayout(
-        new CharLayout(name()[0], KDText::FontSize::Large),
-        new VerticalOffsetLayout(indexLayout, VerticalOffsetLayout::Type::Subscript, false),
-        false);
+      Layout indexLayout = LayoutHelper::String(buffer, strlen(buffer), KDFont::LargeFont);
+      m_secondInitialConditionName = HorizontalLayout(
+        CharLayout(name()[0], KDFont::LargeFont),
+        VerticalOffsetLayout(indexLayout, VerticalOffsetLayoutNode::Type::Subscript)
+      );
     }
   }
   return m_secondInitialConditionName;
@@ -327,27 +253,28 @@ T Sequence::approximateToNextRank(int n, SequenceContext * sqctx) const {
   T vn = sqctx->valueOfSequenceAtPreviousRank<T>(1, 0);
   T vnm1 = sqctx->valueOfSequenceAtPreviousRank<T>(1, 1);
   T vnm2 = sqctx->valueOfSequenceAtPreviousRank<T>(1, 2);
-  Poincare::Symbol vnSymbol(Symbol::SpecialSymbols::vn);
-  Poincare::Symbol vn1Symbol(Symbol::SpecialSymbols::vn1);
-  Poincare::Symbol unSymbol(Symbol::SpecialSymbols::un);
-  Poincare::Symbol un1Symbol(Symbol::SpecialSymbols::un1);
+  Poincare::Symbol vnSymbol("v(n)", 4);
+  Poincare::Symbol vn1Symbol("v(n+1)", 6);
+  Poincare::Symbol unSymbol("u(n)", 4);
+  Poincare::Symbol un1Symbol("u(n+1)", 6);
+  Preferences * preferences = Poincare::Preferences::sharedPreferences();
   switch (m_type) {
     case Type::Explicit:
     {
-      ctx.setValueForSymbol(un, &unSymbol);
-      ctx.setValueForSymbol(vn, &vnSymbol);
-      return expression(sqctx)->approximateWithValueForSymbol(symbol(), (T)n, ctx, Poincare::Preferences::sharedPreferences()->angleUnit());
+      ctx.setValueForSymbol(un, unSymbol);
+      ctx.setValueForSymbol(vn, vnSymbol);
+      return expression(sqctx).approximateWithValueForSymbol(symbol(), (T)n, ctx, preferences->angleUnit());
     }
     case Type::SingleRecurrence:
     {
       if (n == m_initialRank) {
         return PoincareHelpers::ApproximateToScalar<T>(firstInitialConditionExpression(sqctx), *sqctx);
       }
-      ctx.setValueForSymbol(un, &un1Symbol);
-      ctx.setValueForSymbol(unm1, &unSymbol);
-      ctx.setValueForSymbol(vn, &vn1Symbol);
-      ctx.setValueForSymbol(vnm1, &vnSymbol);
-      return expression(sqctx)->approximateWithValueForSymbol(symbol(), (T)(n-1), ctx, Poincare::Preferences::sharedPreferences()->angleUnit());
+      ctx.setValueForSymbol(un, un1Symbol);
+      ctx.setValueForSymbol(unm1, unSymbol);
+      ctx.setValueForSymbol(vn, vn1Symbol);
+      ctx.setValueForSymbol(vnm1, vnSymbol);
+      return expression(sqctx).approximateWithValueForSymbol(symbol(), (T)(n-1), ctx, preferences->angleUnit());
     }
     default:
     {
@@ -357,11 +284,11 @@ T Sequence::approximateToNextRank(int n, SequenceContext * sqctx) const {
       if (n == m_initialRank+1) {
         return PoincareHelpers::ApproximateToScalar<T>(secondInitialConditionExpression(sqctx), *sqctx);
       }
-      ctx.setValueForSymbol(unm1, &un1Symbol);
-      ctx.setValueForSymbol(unm2, &unSymbol);
-      ctx.setValueForSymbol(vnm1, &vn1Symbol);
-      ctx.setValueForSymbol(vnm2, &vnSymbol);
-      return expression(sqctx)->approximateWithValueForSymbol(symbol(), (T)(n-2), ctx, Poincare::Preferences::sharedPreferences()->angleUnit());
+      ctx.setValueForSymbol(unm1, un1Symbol);
+      ctx.setValueForSymbol(unm2, unSymbol);
+      ctx.setValueForSymbol(vnm1, vn1Symbol);
+      ctx.setValueForSymbol(vnm2, vnSymbol);
+      return expression(sqctx).approximateWithValueForSymbol(symbol(), (T)(n-2), ctx, preferences->angleUnit());
     }
   }
 }
@@ -384,38 +311,14 @@ double Sequence::sumBetweenBounds(double start, double end, Context * context) c
 
 void Sequence::tidy() {
   Function::tidy();
-  if (m_firstInitialConditionLayout != nullptr) {
-    delete m_firstInitialConditionLayout;
-    m_firstInitialConditionLayout = nullptr;
-  }
-  if (m_secondInitialConditionLayout != nullptr) {
-    delete m_secondInitialConditionLayout;
-    m_secondInitialConditionLayout = nullptr;
-  }
-  if (m_firstInitialConditionExpression != nullptr) {
-    delete m_firstInitialConditionExpression;
-    m_firstInitialConditionExpression = nullptr;
-  }
-  if (m_secondInitialConditionExpression != nullptr) {
-    delete m_secondInitialConditionExpression;
-    m_secondInitialConditionExpression = nullptr;
-  }
-  if (m_nameLayout != nullptr) {
-    delete m_nameLayout;
-    m_nameLayout = nullptr;
-  }
-  if (m_definitionName != nullptr) {
-    delete m_definitionName;
-    m_definitionName = nullptr;
-  }
-  if (m_firstInitialConditionName != nullptr) {
-    delete m_firstInitialConditionName;
-    m_firstInitialConditionName = nullptr;
-  }
-  if (m_secondInitialConditionName != nullptr) {
-    delete m_secondInitialConditionName;
-    m_secondInitialConditionName = nullptr;
-  }
+  m_firstInitialConditionLayout = Layout();
+  m_secondInitialConditionLayout = Layout();
+  m_firstInitialConditionExpression = Expression();
+  m_secondInitialConditionExpression = Expression();
+  m_nameLayout = Layout();
+  m_definitionName = Layout();
+  m_firstInitialConditionName = Layout();
+  m_secondInitialConditionName = Layout();
 }
 
 template double Sequence::templatedApproximateAtAbscissa<double>(double, SequenceContext*) const;

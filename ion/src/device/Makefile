@@ -6,6 +6,7 @@ ion/src/shared/platform_info.o: SFLAGS += -DHEADER_SECTION="__attribute__((secti
 
 objs += $(addprefix ion/src/shared/, \
   console_line.o \
+  crc32_padded.o\
   events_modifier.o \
 )
 
@@ -25,7 +26,9 @@ objs += $(addprefix ion/src/device/, \
   led.o\
   power.o\
   sd_card.o\
+  stack.o\
   swd.o \
+  timing.o \
   usb.o \
   wakeup.o \
 )

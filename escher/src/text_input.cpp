@@ -3,19 +3,24 @@
 
 /* TextInput::ContentView */
 
-TextInput::ContentView::ContentView(KDText::FontSize size) :
+TextInput::ContentView::ContentView(const KDFont * font) :
   View(),
   m_cursorView(),
-  m_fontSize(size),
+  m_font(font),
   m_cursorIndex(0)
 {
 }
 
 void TextInput::ContentView::setCursorLocation(int location) {
-  int adjustedLocation = location < 0 ? 0 : location;
-  adjustedLocation = adjustedLocation > (signed int)editedTextLength() ? (signed int)editedTextLength() : adjustedLocation;
+  assert(location >= 0);
+  int adjustedLocation = location > (signed int)editedTextLength() ? (signed int)editedTextLength() : location;
   m_cursorIndex = adjustedLocation;
   layoutSubviews();
+}
+
+void TextInput::ContentView::setFont(const KDFont * font) {
+  m_font = font;
+  markRectAsDirty(bounds());
 }
 
 KDRect TextInput::ContentView::cursorRect() {
@@ -54,13 +59,6 @@ TextInput::TextInput(Responder * parentResponder, View * contentView) :
 {
 }
 
-Toolbox * TextInput::toolbox() {
-  if (delegate()) {
-    return delegate()->toolboxForTextInput(this);
-  }
-  return nullptr;
-}
-
 bool TextInput::removeChar() {
   contentView()->removeChar();
   scrollToCursor();
@@ -79,7 +77,9 @@ void TextInput::scrollToCursor() {
 }
 
 bool TextInput::setCursorLocation(int location) {
-  contentView()->setCursorLocation(location);
+  int adjustedLocation = location < 0 ? 0 : location;
+  willSetCursorLocation(&adjustedLocation);
+  contentView()->setCursorLocation(adjustedLocation);
   scrollToCursor();
   return true;
 }
@@ -96,9 +96,13 @@ bool TextInput::insertTextAtLocation(const char * text, int location) {
 }
 
 bool TextInput::removeEndOfLine() {
-  if (contentView()->removeEndOfLine()) {
+  if (privateRemoveEndOfLine()) {
     scrollToCursor();
     return true;
   }
   return false;
+}
+
+bool TextInput::privateRemoveEndOfLine() {
+  return contentView()->removeEndOfLine();
 }

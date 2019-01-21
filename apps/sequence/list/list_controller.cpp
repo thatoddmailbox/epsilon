@@ -9,28 +9,27 @@ using namespace Poincare;
 
 namespace Sequence {
 
-ListController::ListController(Responder * parentResponder, SequenceStore * sequenceStore, ButtonRowController * header, ButtonRowController * footer) :
+ListController::ListController(Responder * parentResponder, ::InputEventHandlerDelegate * inputEventHandlerDelegate, SequenceStore * sequenceStore, ButtonRowController * header, ButtonRowController * footer) :
   Shared::FunctionListController(parentResponder, sequenceStore, header, footer, I18n::Message::AddSequence),
   m_sequenceStore(sequenceStore),
   m_sequenceTitleCells{},
   m_expressionCells{},
-  m_parameterController(this, sequenceStore),
+  m_parameterController(inputEventHandlerDelegate, this, sequenceStore),
   m_typeParameterController(this, sequenceStore, this, TableCell::Layout::Vertical),
   m_typeStackController(nullptr, &m_typeParameterController, KDColorWhite, Palette::PurpleDark, Palette::PurpleDark),
   m_sequenceToolbox()
 {
+  for (int i = 0; i < k_maxNumberOfRows; i++) {
+    m_expressionCells[i].setLeftMargin(k_expressionMargin);
+  }
 }
 
 const char * ListController::title() {
   return I18n::translate(I18n::Message::SequenceTab);
 }
 
-Toolbox * ListController::toolboxForTextInput(TextInput * textInput) {
+Toolbox * ListController::toolboxForInputEventHandler(InputEventHandler * textInput) {
   return toolboxForSender(textInput);
-}
-
-Toolbox * ListController::toolboxForExpressionLayoutField(ExpressionLayoutField * expressionLayoutField) {
-  return toolboxForSender(expressionLayoutField);
 }
 
 TextFieldDelegateApp * ListController::textFieldDelegateApp() {
@@ -38,6 +37,10 @@ TextFieldDelegateApp * ListController::textFieldDelegateApp() {
 }
 
 ExpressionFieldDelegateApp * ListController::expressionFieldDelegateApp() {
+  return (App *)app();
+}
+
+InputEventHandlerDelegateApp * ListController::inputEventHandlerDelegateApp() {
   return (App *)app();
 }
 
@@ -59,17 +62,17 @@ KDCoordinate ListController::expressionRowHeight(int j) {
   }
   Sequence * sequence = m_sequenceStore->modelAtIndex(modelIndexForRow(j));
   KDCoordinate defaultHeight = 2*k_expressionCellVerticalMargin + (sequence->type() == Sequence::Type::Explicit ? Metric::StoreRowHeight : k_emptySubRowHeight);
-  ExpressionLayout * layout = sequence->layout();
+  Layout layout = sequence->layout();
   if (sequenceDefinitionForRow(j) == 1) {
     layout = sequence->firstInitialConditionLayout();
   }
   if (sequenceDefinitionForRow(j) == 2) {
     layout = sequence->secondInitialConditionLayout();
   }
-  if (layout == nullptr) {
+  if (layout.isUninitialized()) {
     return defaultHeight;
   }
-  KDCoordinate sequenceHeight = layout->size().height();
+  KDCoordinate sequenceHeight = layout.layoutSize().height();
   return max(defaultHeight, sequenceHeight + 2*k_expressionCellVerticalMargin);
 }
 
@@ -85,7 +88,7 @@ void ListController::selectPreviousNewSequenceCell() {
   }
 }
 
-Toolbox * ListController::toolboxForSender(Responder * sender) {
+Toolbox * ListController::toolboxForSender(InputEventHandler * sender) {
   // Set extra cells
   int recurrenceDepth = -1;
   int sequenceDefinition = sequenceDefinitionForRow(selectedRow());
@@ -128,8 +131,10 @@ void ListController::editExpression(Sequence * sequence, int sequenceDefinition,
         InputViewController * myInputViewController = (InputViewController *)sender;
         const char * textBody = myInputViewController->textBody();
         mySequence->setContent(textBody);
+        return true; //TODO should return result of mySequence->setContent
         },
         [](void * context, void * sender){
+        return true;
       });
       break;
   case 1:
@@ -139,8 +144,10 @@ void ListController::editExpression(Sequence * sequence, int sequenceDefinition,
       InputViewController * myInputViewController = (InputViewController *)sender;
       const char * textBody = myInputViewController->textBody();
       mySequence->setFirstInitialConditionContent(textBody);
+      return true; //TODO should return result of mySequence->setFirstInitialConditionContent
       },
       [](void * context, void * sender){
+      return true;
     });
     break;
   default:
@@ -150,8 +157,10 @@ void ListController::editExpression(Sequence * sequence, int sequenceDefinition,
       InputViewController * myInputViewController = (InputViewController *)sender;
       const char * textBody = myInputViewController->textBody();
       mySequence->setSecondInitialConditionContent(textBody);
+      return true; //TODO should return the result of mySequence->setSecondInitialConditionContent
       },
       [](void * context, void * sender){
+      return true;
     });
   }
 }
@@ -171,28 +180,27 @@ int ListController::maxNumberOfRows() {
   return k_maxNumberOfRows;
 }
 
-HighlightCell * ListController::titleCells(int index) {
+FunctionTitleCell * ListController::titleCells(int index) {
   assert(index >= 0 && index < k_maxNumberOfRows);
-  return m_sequenceTitleCells[index];
+  return &m_sequenceTitleCells[index];
 }
 
 HighlightCell * ListController::expressionCells(int index) {
   assert(index >= 0 && index < k_maxNumberOfRows);
-  return m_expressionCells[index];
+  return &m_expressionCells[index];
 }
-
 
 void ListController::willDisplayTitleCellAtIndex(HighlightCell * cell, int j) {
   SequenceTitleCell * myCell = (SequenceTitleCell *)cell;
   Sequence * sequence = m_sequenceStore->modelAtIndex(modelIndexForRow(j));
   if (sequenceDefinitionForRow(j) == 0) {
-    myCell->setExpressionLayout(sequence->definitionName());
+    myCell->setLayout(sequence->definitionName());
   }
   if (sequenceDefinitionForRow(j) == 1) {
-    myCell->setExpressionLayout(sequence->firstInitialConditionName());
+    myCell->setLayout(sequence->firstInitialConditionName());
   }
   if (sequenceDefinitionForRow(j) == 2) {
-    myCell->setExpressionLayout(sequence->secondInitialConditionName());
+    myCell->setLayout(sequence->secondInitialConditionName());
   }
   KDColor nameColor = sequence->isActive() ? sequence->color() : Palette::GreyDark;
   myCell->setColor(nameColor);
@@ -202,13 +210,13 @@ void ListController::willDisplayExpressionCellAtIndex(HighlightCell * cell, int 
   FunctionExpressionCell * myCell = (FunctionExpressionCell *)cell;
   Sequence * sequence = m_sequenceStore->modelAtIndex(modelIndexForRow(j));
   if (sequenceDefinitionForRow(j) == 0) {
-    myCell->setExpressionLayout(sequence->layout());
+    myCell->setLayout(sequence->layout());
   }
   if (sequenceDefinitionForRow(j) == 1) {
-    myCell->setExpressionLayout(sequence->firstInitialConditionLayout());
+    myCell->setLayout(sequence->firstInitialConditionLayout());
   }
   if (sequenceDefinitionForRow(j) == 2) {
-    myCell->setExpressionLayout(sequence->secondInitialConditionLayout());
+    myCell->setLayout(sequence->secondInitialConditionLayout());
   }
   bool active = sequence->isActive();
   KDColor textColor = active ? KDColorBlack : Palette::GreyDark;
@@ -288,25 +296,6 @@ void ListController::reinitExpression(Shared::ExpressionModel * model) {
       break;
   }
   selectableTableView()->reloadData();
-}
-
-View * ListController::loadView() {
-  for (int i = 0; i < k_maxNumberOfRows; i++) {
-    m_sequenceTitleCells[i] = new SequenceTitleCell(FunctionTitleCell::Orientation::VerticalIndicator);
-    m_expressionCells[i] = new FunctionExpressionCell();
-    m_expressionCells[i]->setLeftMargin(k_expressionMargin);
-  }
-  return Shared::FunctionListController::loadView();
-}
-
-void ListController::unloadView(View * view) {
-  for (int i = 0; i < k_maxNumberOfRows; i++) {
-    delete m_sequenceTitleCells[i];
-    m_sequenceTitleCells[i] = nullptr;
-    delete m_expressionCells[i];
-    m_expressionCells[i] = nullptr;
-  }
-  Shared::FunctionListController::unloadView(view);
 }
 
 }

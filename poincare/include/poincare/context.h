@@ -1,15 +1,15 @@
 #ifndef POINCARE_CONTEXT_H
 #define POINCARE_CONTEXT_H
 
-#include <poincare/expression.h>
-#include <poincare/symbol.h>
-
 namespace Poincare {
+
+class Expression;
+class SymbolAbstract;
 
 class Context {
 public:
-  virtual const Expression * expressionForSymbol(const Symbol * symbol) = 0;
-  virtual void setExpressionForSymbolName(const Expression * expression, const Symbol * symbol, Context & context) = 0;
+  virtual const Expression expressionForSymbol(const SymbolAbstract & symbol, bool clone) = 0;
+  virtual void setExpressionForSymbol(const Expression & expression, const SymbolAbstract & symbol, Context & context) = 0;
 };
 
 }

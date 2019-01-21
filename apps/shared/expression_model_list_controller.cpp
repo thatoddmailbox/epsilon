@@ -4,10 +4,10 @@
 namespace Shared {
 
 ExpressionModelListController::ExpressionModelListController(Responder * parentResponder, I18n::Message text) :
-  DynamicViewController(parentResponder),
-  m_addNewMessage(text),
-  m_addNewModel(nullptr)
+  ViewController(parentResponder),
+  m_addNewModel()
 {
+  m_addNewModel.setMessage(text);
 }
 
 /* Table Data Source */
@@ -23,17 +23,17 @@ KDCoordinate ExpressionModelListController::expressionRowHeight(int j) {
     return Metric::StoreRowHeight;
   }
   ExpressionModel * m = modelStore()->modelAtIndex(j);
-  if (m->layout() == nullptr) {
+  if (m->layout().isUninitialized()) {
     return Metric::StoreRowHeight;
   }
-  KDCoordinate modelSize = m->layout()->size().height();
-  return modelSize + Metric::StoreRowHeight - KDText::charSize().height();
+  KDCoordinate modelSize = m->layout().layoutSize().height();
+  return modelSize + Metric::StoreRowHeight - KDFont::LargeFont->glyphSize().height();
 }
 
 void ExpressionModelListController::willDisplayExpressionCellAtIndex(HighlightCell * cell, int j) {
   EvenOddExpressionCell * myCell = (EvenOddExpressionCell *)cell;
   ExpressionModel * m = modelStore()->modelAtIndex(j);
-  myCell->setExpressionLayout(m->layout());
+  myCell->setLayout(m->layout());
 }
 
 /* Responder */
@@ -98,8 +98,10 @@ void ExpressionModelListController::editExpression(ExpressionModel * model, Ion:
     InputViewController * myInputViewController = (InputViewController *)sender;
     const char * textBody = myInputViewController->textBody();
     myModel->setContent(textBody);
+    return true; // TODO we should return a result from myModel->setContent, but we will remove ExpressionModelListController soon anyway
     },
     [](void * context, void * sender){
+    return true;
     });
 }
 
@@ -114,20 +116,6 @@ int ExpressionModelListController::modelIndexForRow(int j) {
 
 bool ExpressionModelListController::isAddEmptyRow(int j) {
   return j == modelStore()->numberOfModels();
-}
-
-SelectableTableView * ExpressionModelListController::selectableTableView() {
-  return (SelectableTableView *)view();
-}
-
-void ExpressionModelListController::loadAddModelCell() {
-  m_addNewModel = new EvenOddMessageTextCell();
-  m_addNewModel->setMessage(m_addNewMessage);
-}
-
-void ExpressionModelListController::unloadAddModelCell() {
-  delete m_addNewModel;
-  m_addNewModel = nullptr;
 }
 
 }

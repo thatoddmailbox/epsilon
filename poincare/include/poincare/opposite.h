@@ -1,34 +1,58 @@
 #ifndef POINCARE_OPPOSITE_H
 #define POINCARE_OPPOSITE_H
 
-#include <poincare/static_hierarchy.h>
-#include <poincare/layout_engine.h>
-#include <poincare/approximation_engine.h>
+#include <poincare/expression.h>
+#include <poincare/approximation_helper.h>
 
 namespace Poincare {
 
-class Opposite : public StaticHierarchy<1> {
-  using StaticHierarchy<1>::StaticHierarchy;
+class Opposite;
+
+class OppositeNode /*final*/ : public ExpressionNode {
 public:
-  Expression * clone() const override;
-  Type type() const override;
-  int polynomialDegree(char symbolName) const override;
+  template<typename T> static Complex<T> compute(const std::complex<T> c, Preferences::AngleUnit angleUnit = Preferences::AngleUnit::Degree) { return Complex<T>(-c); }
+
+
+  // TreeNode
+  size_t size() const override { return sizeof(OppositeNode); }
+  int numberOfChildren() const override { return 1; }
+#if POINCARE_TREE_LOG
+  virtual void logNodeName(std::ostream & stream) const override {
+    stream << "Opposite";
+  }
+#endif
+
+  // Properties
+  Type type() const override { return Type::Opposite; }
+  int polynomialDegree(Context & context, const char * symbolName) const override;
   Sign sign() const override;
-  template<typename T> static std::complex<T> compute(const std::complex<T> c, AngleUnit angleUnit);
-private:
-  /* Layout */
-  bool needParenthesisWithParent(const Expression * e) const override;
-  ExpressionLayout * createLayout(PrintFloat::Mode floatDisplayMode, int numberOfSignificantDigits) const override;
-  int writeTextInBuffer(char * buffer, int bufferSize, PrintFloat::Mode floatDisplayMode, int numberOfSignificantDigits) const override;
-  /* Simplification */
-  Expression * shallowReduce(Context& context, AngleUnit angleUnit) override;
-  /* Evaluation */
-  Evaluation<float> * privateApproximate(SinglePrecision p, Context& context, AngleUnit angleUnit) const override {
-    return ApproximationEngine::map<float>(this, context, angleUnit, compute<float>);
+
+  // Approximation
+  Evaluation<float> approximate(SinglePrecision p, Context& context, Preferences::AngleUnit angleUnit) const override {
+    return ApproximationHelper::Map<float>(this, context, angleUnit, compute<float>);
   }
-  Evaluation<double> * privateApproximate(DoublePrecision p, Context& context, AngleUnit angleUnit) const override {
-    return ApproximationEngine::map<double>(this, context, angleUnit, compute<double>);
+  Evaluation<double> approximate(DoublePrecision p, Context& context, Preferences::AngleUnit angleUnit) const override {
+    return ApproximationHelper::Map<double>(this, context, angleUnit, compute<double>);
   }
+
+  // Layout
+  bool childNeedsParenthesis(const TreeNode * child) const override;
+  Layout createLayout(Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const override;
+  int serialize(char * buffer, int bufferSize, Preferences::PrintFloatMode floatDisplayMode = Preferences::PrintFloatMode::Decimal, int numberOfSignificantDigits = 0) const override;
+
+  // Simplification
+  Expression shallowReduce(Context & context, Preferences::AngleUnit angleUnit, bool replaceSymbols = true) override;
+};
+
+class Opposite final : public Expression {
+public:
+  Opposite();
+  Opposite(const OppositeNode * n) : Expression(n) {}
+  explicit Opposite(Expression child) : Expression(TreePool::sharedPool()->createTreeNode<OppositeNode>()) {
+    replaceChildAtIndexInPlace(0, child);
+  }
+
+  Expression shallowReduce(Context & context, Preferences::AngleUnit angleUnit, bool replaceSymbols = true);
 };
 
 }

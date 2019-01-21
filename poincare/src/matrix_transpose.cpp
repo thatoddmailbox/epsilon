@@ -1,49 +1,66 @@
 #include <poincare/matrix_transpose.h>
-#include <poincare/matrix.h>
 #include <poincare/division.h>
-extern "C" {
-#include <assert.h>
-}
+#include <poincare/layout_helper.h>
+#include <poincare/matrix.h>
+#include <poincare/rational.h>
+#include <poincare/serialization_helper.h>
 #include <cmath>
 
 namespace Poincare {
 
-Expression::Type MatrixTranspose::type() const {
-  return Type::MatrixTranspose;
+constexpr Expression::FunctionHelper MatrixTranspose::s_functionHelper;
+
+int MatrixTransposeNode::numberOfChildren() const { return MatrixTranspose::s_functionHelper.numberOfChildren(); }
+
+Expression MatrixTransposeNode::shallowReduce(Context & context, Preferences::AngleUnit angleUnit, bool replaceSymbols) {
+  return MatrixTranspose(this).shallowReduce(context, angleUnit, replaceSymbols);
 }
 
-Expression * MatrixTranspose::clone() const {
-  MatrixTranspose * a = new MatrixTranspose(m_operands, true);
-  return a;
+Layout MatrixTransposeNode::createLayout(Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const {
+  return LayoutHelper::Prefix(MatrixTranspose(this), floatDisplayMode, numberOfSignificantDigits, MatrixTranspose::s_functionHelper.name());
 }
 
-Expression * MatrixTranspose::shallowReduce(Context& context, AngleUnit angleUnit) {
-  Expression * e = Expression::shallowReduce(context, angleUnit);
-  if (e != this) {
-    return e;
-  }
-  Expression * op = editableOperand(0);
-#if MATRIX_EXACT_REDUCING
-  if (op->type() == Type::Matrix) {
-    Matrix * transpose = static_cast<Matrix *>(op)->createTranspose();
-    return replaceWith(transpose, true);
-  }
-  if (!op->recursivelyMatches(Expression::IsMatrix)) {
-    return replaceWith(op, true);
-  }
-  return this;
-#else
-  return replaceWith(op, true);
-#endif
+int MatrixTransposeNode::serialize(char * buffer, int bufferSize, Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const {
+  return SerializationHelper::Prefix(this, buffer, bufferSize, floatDisplayMode, numberOfSignificantDigits, MatrixTranspose::s_functionHelper.name());
 }
 
 template<typename T>
-Evaluation<T> * MatrixTranspose::templatedApproximate(Context& context, AngleUnit angleUnit) const {
-  Evaluation<T> * input = operand(0)->privateApproximate(T(), context, angleUnit);
-  Evaluation<T> * transpose = input->createTranspose();
-  assert(transpose != nullptr);
-  delete input;
+Evaluation<T> MatrixTransposeNode::templatedApproximate(Context& context, Preferences::AngleUnit angleUnit) const {
+  Evaluation<T> input = childAtIndex(0)->approximate(T(), context, angleUnit);
+  Evaluation<T> transpose;
+  if (input.type() == EvaluationNode<T>::Type::MatrixComplex) {
+    transpose = static_cast<MatrixComplex<T>&>(input).transpose();
+  } else {
+    transpose = input;
+  }
+  assert(!transpose.isUninitialized());
   return transpose;
+}
+
+Expression MatrixTranspose::shallowReduce(Context & context, Preferences::AngleUnit angleUnit, bool replaceSymbols) {
+  {
+    Expression e = Expression::defaultShallowReduce(context, angleUnit);
+    if (e.isUndefined()) {
+      return e;
+    }
+  }
+  Expression c = childAtIndex(0);
+#if MATRIX_EXACT_REDUCING
+  if (c.type() == ExpressionNode::Type::Matrix) {
+    Matrix transpose = static_cast<Matrix&>(c).createTranspose();
+    return transpose;
+  }
+  if (!c.recursivelyMatches(Expression::IsMatrix)) {
+    return c;
+  }
+  return *this;
+#else
+  if (c.type() != ExpressionNode::Type::Matrix) {
+    replaceWithInPlace(c);
+    return c;
+  }
+  return *this;
+#endif
 }
 
 }

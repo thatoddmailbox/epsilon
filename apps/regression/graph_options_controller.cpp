@@ -9,11 +9,11 @@ using namespace Shared;
 
 namespace Regression {
 
-GraphOptionsController::GraphOptionsController(Responder * parentResponder, Store * store, CurveViewCursor * cursor, GraphController * graphController) :
+GraphOptionsController::GraphOptionsController(Responder * parentResponder, InputEventHandlerDelegate * inputEventHandlerDelegate, Store * store, CurveViewCursor * cursor, GraphController * graphController) :
   ViewController(parentResponder),
   m_changeRegressionCell(I18n::Message::Regression),
   m_selectableTableView(this),
-  m_goToParameterController(this, store, cursor, graphController),
+  m_goToParameterController(this, inputEventHandlerDelegate, store, cursor, graphController),
   m_store(store),
   m_graphController(graphController)
 {
@@ -116,7 +116,7 @@ int GraphOptionsController::typeAtLocation(int i, int j) {
 
 void GraphOptionsController::willDisplayCellForIndex(HighlightCell * cell, int index) {
   if (index == numberOfRows() - 1) {
-    m_changeRegressionCell.setExpressionLayout(static_cast<Store *>(m_store)->modelForSeries(m_graphController->selectedSeriesIndex())->layout());
+    m_changeRegressionCell.setLayout(static_cast<Store *>(m_store)->modelForSeries(m_graphController->selectedSeriesIndex())->layout());
     return;
   }
   assert(index >=0 && index < k_numberOfParameterCells);

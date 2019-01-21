@@ -3,9 +3,6 @@
 #include "regression_context.h"
 #include "../apps_container.h"
 #include "../constant.h"
-#include "../../poincare/src/layout/char_layout.h"
-#include "../../poincare/src/layout/horizontal_layout.h"
-#include "../../poincare/src/layout/vertical_offset_layout.h"
 #include <assert.h>
 
 using namespace Poincare;
@@ -13,8 +10,8 @@ using namespace Shared;
 
 namespace Regression {
 
-StoreController::StoreController(Responder * parentResponder, Store * store, ButtonRowController * header) :
-  Shared::StoreController(parentResponder, store, header),
+StoreController::StoreController(Responder * parentResponder, InputEventHandlerDelegate * inputEventHandlerDelegate, Store * store, ButtonRowController * header) :
+  Shared::StoreController(parentResponder, inputEventHandlerDelegate, store, header),
   m_titleCells{},
   m_regressionContext(store),
   m_storeParameterController(this, store, this)
@@ -33,7 +30,7 @@ void StoreController::setFormulaLabel() {
   static_cast<ContentView *>(view())->formulaInputView()->setBufferText(text);
 }
 
-bool StoreController::fillColumnWithFormula(Expression * formula) {
+bool StoreController::fillColumnWithFormula(Expression formula) {
   return privateFillColumnWithFormula(formula, Symbol::isRegressionSymbol);
 }
 
@@ -53,22 +50,7 @@ void StoreController::willDisplayCellAtLocation(HighlightCell * cell, int i, int
 
 HighlightCell * StoreController::titleCells(int index) {
   assert(index >= 0 && index < k_numberOfTitleCells);
-  return m_titleCells[index];
-}
-
-View * StoreController::loadView() {
-  for (int i = 0; i < k_numberOfTitleCells; i++) {
-    m_titleCells[i] = new Shared::StoreTitleCell();
-  }
-  return Shared::StoreController::loadView();
-}
-
-void StoreController::unloadView(View * view) {
-  for (int i = 0; i < k_numberOfTitleCells; i++) {
-    delete m_titleCells[i];
-    m_titleCells[i] = nullptr;
-  }
-  Shared::StoreController::unloadView(view);
+  return &m_titleCells[index];
 }
 
 }

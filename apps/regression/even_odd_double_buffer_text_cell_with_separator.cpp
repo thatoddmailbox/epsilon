@@ -9,8 +9,8 @@ EvenOddDoubleBufferTextCellWithSeparator::EvenOddDoubleBufferTextCellWithSeparat
   EvenOddCell(),
   Responder(parentResponder),
   m_firstTextSelected(true),
-  m_firstBufferTextView(KDText::FontSize::Small, horizontalAlignment, verticalAlignment),
-  m_secondBufferTextView(KDText::FontSize::Small, horizontalAlignment, verticalAlignment)
+  m_firstBufferTextView(KDFont::SmallFont, horizontalAlignment, verticalAlignment),
+  m_secondBufferTextView(KDFont::SmallFont, horizontalAlignment, verticalAlignment)
 {
 }
 
@@ -38,7 +38,6 @@ void EvenOddDoubleBufferTextCellWithSeparator::selectFirstText(bool selectFirstT
   m_firstTextSelected = selectFirstText;
   m_firstBufferTextView.setHighlighted(selectFirstText);
   m_secondBufferTextView.setHighlighted(!selectFirstText);
-  reloadCell();
 }
 
 void EvenOddDoubleBufferTextCellWithSeparator::reloadCell() {
@@ -54,10 +53,9 @@ void EvenOddDoubleBufferTextCellWithSeparator::setHighlighted(bool highlight) {
     if (m_firstTextSelected) {
       m_firstBufferTextView.setHighlighted(true);
     } else {
-      m_secondBufferTextView.setHighlighted(false);
+      m_secondBufferTextView.setHighlighted(true);
     }
   }
-  reloadCell();
 }
 
 void EvenOddDoubleBufferTextCellWithSeparator::setEven(bool even) {

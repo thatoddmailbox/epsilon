@@ -1,25 +1,36 @@
 #include <poincare/random.h>
+#include <poincare/complex.h>
 #include <ion.h>
-
-extern "C" {
+#include <poincare/layout_helper.h>
+#include <poincare/serialization_helper.h>
 #include <assert.h>
-}
 #include <cmath>
 
 namespace Poincare {
 
-Expression::Type Random::type() const {
-  return Type::Random;
+constexpr Expression::FunctionHelper Random::s_functionHelper;
+
+int RandomNode::numberOfChildren() const { return Random::s_functionHelper.numberOfChildren(); }
+
+Expression RandomNode::setSign(Sign s, Context & context, Preferences::AngleUnit angleUnit) {
+  return Random(this).setSign(s, context, angleUnit);
 }
 
-Expression * Random::clone() const {
-  Random * a = new Random();
-  return a;
+Layout RandomNode::createLayout(Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const {
+  return LayoutHelper::Prefix(Random(this), floatDisplayMode, numberOfSignificantDigits, Random::s_functionHelper.name());
 }
 
-Expression * Random::setSign(Sign s, Context & context, AngleUnit angleUnit) {
-  assert(s == Sign::Positive);
-  return this;
+int RandomNode::serialize(char * buffer, int bufferSize, Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const {
+  return SerializationHelper::Prefix(this, buffer, bufferSize, floatDisplayMode, numberOfSignificantDigits, Random::s_functionHelper.name());
+}
+
+template <typename T> Evaluation<T> RandomNode::templateApproximate() const {
+  return Complex<T>(Random::random<T>());
+}
+
+Expression Random::setSign(ExpressionNode::Sign s, Context & context, Preferences::AngleUnit angleUnit) {
+  assert(s == ExpressionNode::Sign::Positive);
+  return *this;
 }
 
 template<typename T> T Random::random() {
@@ -36,6 +47,8 @@ template<typename T> T Random::random() {
   }
 }
 
+template Evaluation<float> RandomNode::templateApproximate<float>() const;
+template Evaluation<double> RandomNode::templateApproximate<double>() const;
 template float Random::random();
 template double Random::random();
 

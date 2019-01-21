@@ -1,26 +1,26 @@
 #include "linear_model.h"
 #include "../store.h"
-#include "../../poincare/include/poincare_layouts.h"
 #include <math.h>
 #include <assert.h>
+#include <poincare/char_layout.h>
+#include <poincare/horizontal_layout.h>
 
 using namespace Poincare;
 
 namespace Regression {
 
-ExpressionLayout * LinearModel::layout() {
-  static ExpressionLayout * layout = nullptr;
-  if (layout == nullptr) {
-    const ExpressionLayout * layoutChildren[] = {
-      new CharLayout('a', KDText::FontSize::Small),
-      new CharLayout(Ion::Charset::MiddleDot, KDText::FontSize::Small),
-      new CharLayout('X', KDText::FontSize::Small),
-      new CharLayout('+', KDText::FontSize::Small),
-      new CharLayout('b', KDText::FontSize::Small),
+Layout LinearModel::layout() {
+  if (m_layout.isUninitialized()) {
+    const Layout layoutChildren[] = {
+      CharLayout('a', KDFont::SmallFont),
+      CharLayout(Ion::Charset::MiddleDot, KDFont::SmallFont),
+      CharLayout('X', KDFont::SmallFont),
+      CharLayout('+', KDFont::SmallFont),
+      CharLayout('b', KDFont::SmallFont),
     };
-    layout = new HorizontalLayout(layoutChildren, 5, false);
+    m_layout = HorizontalLayout(layoutChildren, 5);
   }
-  return layout;
+  return m_layout;
 }
 
 double LinearModel::evaluate(double * modelCoefficients, double x) const {

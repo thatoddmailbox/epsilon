@@ -1,39 +1,53 @@
 #ifndef POINCARE_RANDOM_H
 #define POINCARE_RANDOM_H
 
-#include <poincare/static_hierarchy.h>
+#include <poincare/expression.h>
 #include <poincare/evaluation.h>
-#include <poincare/layout_engine.h>
 
 namespace Poincare {
 
-class Random : public StaticHierarchy<0> {
-  using StaticHierarchy<0>::StaticHierarchy;
+class RandomNode final : public ExpressionNode  {
 public:
-  Type type() const override;
-  Expression * clone() const override;
+
+  // TreeNode
+  size_t size() const override { return sizeof(RandomNode); }
+  int numberOfChildren() const override;
+#if POINCARE_TREE_LOG
+  virtual void logNodeName(std::ostream & stream) const override {
+    stream << "Random";
+  }
+#endif
+
+  // Properties
+  Type type() const override { return Type::Random; }
   Sign sign() const override { return Sign::Positive; }
-  template<typename T> static T random();
+  Expression setSign(Sign s, Context & context, Preferences::AngleUnit angleUnit) override;
 private:
-  Expression * setSign(Sign s, Context & context, AngleUnit angleUnit) override;
-  /* Layout */
-  ExpressionLayout * createLayout(PrintFloat::Mode floatDisplayMode, int numberOfSignificantDigits) const override {
-    return LayoutEngine::createPrefixLayout(this, floatDisplayMode, numberOfSignificantDigits, name());
-  }
-  int writeTextInBuffer(char * buffer, int bufferSize, PrintFloat::Mode floatDisplayMode, int numberOfSignificantDigits) const override {
-    return LayoutEngine::writePrefixExpressionTextInBuffer(this, buffer, bufferSize, floatDisplayMode, numberOfSignificantDigits, name());
-  }
-  const char * name() const { return "random"; }
-  /* Evaluation */
-  Evaluation<float> * privateApproximate(SinglePrecision p, Context& context, AngleUnit angleUnit) const override {
+  // Layout
+  Layout createLayout(Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const override;
+  int serialize(char * buffer, int bufferSize, Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const override;
+  // Evaluation
+  Evaluation<float> approximate(SinglePrecision p, Context& context, Preferences::AngleUnit angleUnit) const override {
     return templateApproximate<float>();
   }
-  Evaluation<double> * privateApproximate(DoublePrecision p, Context& context, AngleUnit angleUnit) const override {
+  Evaluation<double> approximate(DoublePrecision p, Context& context, Preferences::AngleUnit angleUnit) const override {
     return templateApproximate<double>();
   }
-  template <typename T> Evaluation<T> * templateApproximate() const {
-    return new Complex<T>(random<T>());
-  }
+  template <typename T> Evaluation<T> templateApproximate() const;
+};
+
+class Random final : public Expression {
+friend class RandomNode;
+public:
+  Random(const RandomNode * n) : Expression(n) {}
+  static Random Builder() { return Random(); }
+  static Expression UntypedBuilder(Expression children) { return Builder(); }
+  static constexpr Expression::FunctionHelper s_functionHelper = Expression::FunctionHelper("random", 0, &UntypedBuilder);
+
+  template<typename T> static T random();
+private:
+  Random() : Expression(TreePool::sharedPool()->createTreeNode<RandomNode>()) {}
+  Expression setSign(ExpressionNode::Sign s, Context & context, Preferences::AngleUnit angleUnit);
 };
 
 }

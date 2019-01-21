@@ -1,11 +1,4 @@
-extern "C" {
-#include <assert.h>
-#include <stdlib.h>
-#include <math.h>
-#include <limits.h>
-}
 #include <poincare/equal.h>
-#include <ion.h>
 #include <poincare/rational.h>
 #include <poincare/addition.h>
 #include <poincare/division.h>
@@ -15,51 +8,57 @@ extern "C" {
 #include <poincare/square_root.h>
 #include <poincare/subtraction.h>
 #include <poincare/symbol.h>
-#include "layout/char_layout.h"
-#include "layout/horizontal_layout.h"
-
+#include <poincare/char_layout.h>
+#include <poincare/serialization_helper.h>
+#include <poincare/horizontal_layout.h>
+#include <ion.h>
+extern "C" {
+#include <assert.h>
+#include <stdlib.h>
+#include <math.h>
+#include <limits.h>
+}
 namespace Poincare {
 
-Expression::Type Equal::type() const {
-  return Type::Equal;
+Expression EqualNode::shallowReduce(Context & context, Preferences::AngleUnit angleUnit, bool replaceSymbols) {
+  return Equal(this).shallowReduce(context, angleUnit, replaceSymbols);
 }
 
-Expression * Equal::clone() const {
-  return new Equal(operands(), true);
-}
-
-int Equal::polynomialDegree(char symbolName) const {
-  return -1;
-}
-
-Expression * Equal::standardEquation(Context & context, AngleUnit angleUnit) const {
-  Expression * sub = new Subtraction(operand(0), operand(1), true);
-  Reduce(&sub, context, angleUnit);
-  return sub;
-}
-
-Expression * Equal::shallowReduce(Context& context, AngleUnit angleUnit) {
-  Expression * e = Expression::shallowReduce(context, angleUnit);
-  if (e != this) {
-    return e;
-  }
-  if (operand(0)->isIdenticalTo(operand(1))) {
-    return replaceWith(new Rational(1), true);
-  }
-  return this;
-}
-
-ExpressionLayout * Equal::createLayout(PrintFloat::Mode floatDisplayMode, int numberOfSignificantDigits) const {
-  HorizontalLayout * result = new HorizontalLayout();
-  result->addOrMergeChildAtIndex(operand(0)->createLayout(floatDisplayMode, numberOfSignificantDigits), 0, false);
-  result->addChildAtIndex(new CharLayout('='), result->numberOfChildren());
-  result->addOrMergeChildAtIndex(operand(1)->createLayout(floatDisplayMode, numberOfSignificantDigits), result->numberOfChildren(), false);
+Layout EqualNode::createLayout(Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const {
+  HorizontalLayout result;
+  result.addOrMergeChildAtIndex(childAtIndex(0)->createLayout(floatDisplayMode, numberOfSignificantDigits), 0, false);
+  result.addChildAtIndex(CharLayout('='), result.numberOfChildren(), result.numberOfChildren(), nullptr);
+  result.addOrMergeChildAtIndex(childAtIndex(1)->createLayout(floatDisplayMode, numberOfSignificantDigits), result.numberOfChildren(), false);
   return result;
 }
 
+int EqualNode::serialize(char * buffer, int bufferSize, Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const {
+  return SerializationHelper::Infix(this, buffer, bufferSize, floatDisplayMode, numberOfSignificantDigits, "=");
+}
+
 template<typename T>
-Evaluation<T> * Equal::templatedApproximate(Context& context, AngleUnit angleUnit) const {
-  return new Complex<T>(Complex<T>::Undefined());
+Evaluation<T> EqualNode::templatedApproximate(Context& context, Preferences::AngleUnit angleUnit) const {
+  return Complex<T>::Undefined();
+}
+
+Expression Equal::standardEquation(Context & context, Preferences::AngleUnit angleUnit) const {
+  Expression sub = Subtraction(childAtIndex(0).clone(), childAtIndex(1).clone());
+  return sub.reduce(context, angleUnit);
+}
+
+Expression Equal::shallowReduce(Context & context, Preferences::AngleUnit angleUnit, bool replaceSymbols) {
+  {
+    Expression e = Expression::defaultShallowReduce(context, angleUnit);
+    if (e.isUndefined()) {
+      return e;
+    }
+  }
+  if (childAtIndex(0).isIdenticalTo(childAtIndex(1))) {
+    Expression result = Rational(1);
+    replaceWithInPlace(result);
+    return result;
+  }
+  return *this;
 }
 
 }

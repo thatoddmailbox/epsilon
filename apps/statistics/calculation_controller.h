@@ -2,21 +2,24 @@
 #define STATISTICS_CALCULATION_CONTROLLER_H
 
 #include <escher.h>
+#include <poincare/print_float.h>
 #include "store.h"
+#include "calculation_selectable_table_view.h"
 #include "../shared/hideable_even_odd_cell.h"
 #include "../shared/margin_even_odd_message_text_cell.h"
 #include "../shared/separator_even_odd_buffer_text_cell.h"
 #include "../shared/store_title_cell.h"
 #include "../shared/tab_table_controller.h"
+#include "../constant.h"
 
 namespace Statistics {
 
-class CalculationController : public Shared::TabTableController, public ButtonRowDelegate, public TableViewDataSource, public AlternateEmptyViewDelegate {
+class CalculationController : public Shared::TabTableController, public ButtonRowDelegate, public TableViewDataSource, public AlternateEmptyViewDefaultDelegate {
 
 public:
   CalculationController(Responder * parentResponder, ButtonRowController * header, Store * store);
 
-  // AlternateEmptyViewDelegate
+  // AlternateEmptyViewDefaultDelegate
   bool isEmpty() const override;
   I18n::Message emptyMessage() override;
   Responder * defaultController() override;
@@ -52,18 +55,18 @@ private:
   static constexpr int k_hideableCellType = 3;
   static constexpr KDCoordinate k_cellHeight = 20;
   static constexpr KDCoordinate k_calculationTitleCellWidth = 175;
-  static constexpr KDCoordinate k_calculationCellWidth = 84;
+  // TODO: change 7 for KDFont::SmallFont->glyphSize().width()
+  static constexpr KDCoordinate k_calculationCellWidth = 7*(Poincare::PrintFloat::bufferSizeForFloatsWithPrecision(Constant::LargeNumberOfSignificantDigits));
   static constexpr KDCoordinate k_margin = 8;
   static constexpr KDCoordinate k_scrollBarMargin = Metric::CommonRightMargin;
 
   Responder * tabController() const override;
-  View * loadView() override;
-  void unloadView(View * view) override;
-
-  Shared::StoreTitleCell * m_seriesTitleCells[k_numberOfSeriesTitleCells];
-  Shared::MarginEvenOddMessageTextCell * m_calculationTitleCells[k_numberOfCalculationTitleCells];
-  Shared::SeparatorEvenOddBufferTextCell * m_calculationCells[k_numberOfCalculationCells];
-  Shared::HideableEvenOddCell * m_hideableCell;
+  SelectableTableView * selectableTableView() override { return &m_selectableTableView; }
+  CalculationSelectableTableView m_selectableTableView;
+  Shared::StoreTitleCell m_seriesTitleCells[k_numberOfSeriesTitleCells];
+  Shared::MarginEvenOddMessageTextCell m_calculationTitleCells[k_numberOfCalculationTitleCells];
+  Shared::SeparatorEvenOddBufferTextCell m_calculationCells[k_numberOfCalculationCells];
+  Shared::HideableEvenOddCell m_hideableCell;
   Store * m_store;
 };
 

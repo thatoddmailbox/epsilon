@@ -3,7 +3,7 @@
 
 #include <escher.h>
 #include "../shared/expression_model_list_controller.h"
-#include "../shared/expression_layout_field_delegate.h"
+#include "../shared/layout_field_delegate.h"
 #include "../shared/text_field_delegate.h"
 #include "equation_store.h"
 #include "equation_list_view.h"
@@ -12,7 +12,7 @@
 
 namespace Solver {
 
-class ListController : public Shared::ExpressionModelListController, public ButtonRowDelegate, public ListViewDataSource, public Shared::TextFieldDelegate, public Shared::ExpressionLayoutFieldDelegate {
+class ListController : public Shared::ExpressionModelListController, public ButtonRowDelegate, public ListViewDataSource, public Shared::TextFieldDelegate, public Shared::LayoutFieldDelegate {
 public:
   ListController(Responder * parentResponder, EquationStore * equationStore, ButtonRowController * footer);
   /* ButtonRowDelegate */
@@ -34,13 +34,15 @@ public:
   void didBecomeFirstResponder() override;
   void didEnterResponderChain(Responder * previousFirstResponder) override;
   void editExpression(Shared::ExpressionModel * model, Ion::Events::Event event) override { return Shared::ExpressionModelListController::editExpression(model, event); }
-  /* Text/ExpressionLayout Field Delegate */
+  /* ViewController */
+  View * view() override { return &m_equationListView; }
+  /* Text/Layout Field Delegate */
   Shared::TextFieldDelegateApp * textFieldDelegateApp() override;
   Shared::ExpressionFieldDelegateApp * expressionFieldDelegateApp() override;
   bool textFieldDidReceiveEvent(TextField * textField, Ion::Events::Event event) override;
-  bool expressionLayoutFieldDidReceiveEvent(ExpressionLayoutField * expressionLayoutField, Ion::Events::Event event) override;
+  bool layoutFieldDidReceiveEvent(LayoutField * layoutField, Ion::Events::Event event) override;
   bool textFieldDidFinishEditing(TextField * textField, const char * text, Ion::Events::Event event) override;
-  bool expressionLayoutFieldDidFinishEditing(ExpressionLayoutField * expressionLayoutField, Poincare::ExpressionLayout * layout, Ion::Events::Event event) override;
+  bool layoutFieldDidFinishEditing(LayoutField * layoutField, Poincare::Layout layout, Ion::Events::Event event) override;
   /* Specific to Solver */
   void resolveEquations();
 private:
@@ -50,13 +52,12 @@ private:
   void addEmptyModel() override;
   bool removeModelRow(Shared::ExpressionModel * function) override;
   void reloadBrace();
-  View * loadView() override;
-  void unloadView(View * view) override;
   Shared::ExpressionModelStore * modelStore() override { return m_equationStore; }
   StackViewController * stackController() const;
   InputViewController * inputController() override;
   EquationStore * m_equationStore;
-  EvenOddExpressionCell * m_expressionCells[k_maxNumberOfRows];
+  EquationListView m_equationListView;
+  EvenOddExpressionCell m_expressionCells[k_maxNumberOfRows];
   Button m_resolveButton;
   EquationModelsParameterController m_modelsParameterController;
   StackViewController m_modelsStackController;

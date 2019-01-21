@@ -1,7 +1,7 @@
 #ifndef SHARED_FUNCTION_APP_H
 #define SHARED_FUNCTION_APP_H
 
-#include <poincare.h>
+#include <poincare/preferences.h>
 #include "expression_field_delegate_app.h"
 #include "curve_view_cursor.h"
 #include "interval.h"
@@ -18,7 +18,7 @@ public:
     CurveViewCursor * cursor();
     uint32_t * modelVersion();
     uint32_t * rangeVersion();
-    Poincare::Expression::AngleUnit * angleUnitVersion();
+    Poincare::Preferences::AngleUnit * angleUnitVersion();
     Interval * interval();
     int * indexFunctionSelectedByCursor();
     void reset() override;
@@ -29,7 +29,7 @@ public:
     int m_indexFunctionSelectedByCursor;
     uint32_t m_modelVersion;
     uint32_t m_rangeVersion;
-    Poincare::Expression::AngleUnit m_angleUnitVersion;
+    Poincare::Preferences::AngleUnit m_angleUnitVersion;
  };
   virtual ~FunctionApp() = default;
   virtual InputViewController * inputViewController() = 0;

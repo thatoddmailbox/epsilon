@@ -1,22 +1,17 @@
 #include "equation.h"
 
+#include <poincare/equal.h>
+#include <poincare/undefined.h>
+#include <poincare/rational.h>
+
 using namespace Poincare;
 
 namespace Solver {
 
 Equation::Equation() :
   Shared::ExpressionModel(),
-  m_standardForm(nullptr)
+  m_standardForm()
 {
-}
-
-Equation& Equation::operator=(const Equation& other) {
-  Shared::ExpressionModel::operator=(other);
-  return *this;
-}
-
-Equation::~Equation() {
-  tidyStandardForm();
 }
 
 void Equation::setContent(const char * c) {
@@ -27,33 +22,30 @@ void Equation::setContent(const char * c) {
 
 void Equation::tidy() {
   ExpressionModel::tidy();
-  if (m_standardForm) {
-    delete m_standardForm;
-    m_standardForm = nullptr;
-  }
+  tidyStandardForm();
 }
 
-Expression * Equation::standardForm(Context * context) const {
-  if (m_standardForm == nullptr) {
-    Expression * e = expression(context);
-    if (e->type() == Expression::Type::Equal) {
-      m_standardForm = static_cast<const Equal *>(e)->standardEquation(*context, Preferences::sharedPreferences()->angleUnit());
-    } else if (e->type() == Expression::Type::Rational && static_cast<Rational *>(e)->isOne()) {
-      // The equality was reduced which means the equality was always true.
-      m_standardForm = new Rational(0);
+Expression Equation::standardForm(Context * context) const {
+  if (m_standardForm.isUninitialized()) {
+    const Expression e = expression(context);
+    if (e.recursivelyMatches([](const Expression e, Context & context, bool replaceSymbols) { return e.type() == ExpressionNode::Type::Undefined || e.type() == ExpressionNode::Type::Infinity || Expression::IsMatrix(e, context, replaceSymbols); }, *context, true)) {
+      m_standardForm = Undefined();
+      return m_standardForm;
+    }
+    if (e.type() == ExpressionNode::Type::Equal) {
+      m_standardForm = static_cast<const Equal&>(e).standardEquation(*context, Preferences::sharedPreferences()->angleUnit());
     } else {
-      // The equality has an undefined operand
-      assert(e->type() == Expression::Type::Undefined);
+      assert(e.type() == ExpressionNode::Type::Rational && static_cast<const Rational&>(e).isOne());
+      // The equality was reduced which means the equality was always true.
+      m_standardForm = Rational(0);
     }
   }
   return m_standardForm;
 }
 
 void Equation::tidyStandardForm() {
-  if (m_standardForm) {
-    delete m_standardForm;
-    m_standardForm = nullptr;
-  }
+  // Free the pool of the m_standardForm
+  m_standardForm = Expression();
 }
 
 }

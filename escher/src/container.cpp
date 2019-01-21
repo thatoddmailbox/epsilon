@@ -9,7 +9,7 @@ Container::Container() :
 
 Container::~Container() {
   if (m_activeApp) {
-    delete m_activeApp;
+    m_activeApp->~App();
   }
 }
 
@@ -36,7 +36,11 @@ App * Container::activeApp() {
 }
 
 bool Container::dispatchEvent(Ion::Events::Event event) {
-  if (event == Ion::Events::TimerFire || m_activeApp->processEvent(event)) {
+  if (event == Ion::Events::TimerFire ) {
+    window()->redraw();
+    return true;
+  }
+  if (m_activeApp->processEvent(event)) {
     window()->redraw();
     return true;
   }

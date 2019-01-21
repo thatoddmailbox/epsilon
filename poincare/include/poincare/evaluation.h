@@ -1,92 +1,71 @@
 #ifndef POINCARE_EVALUATION_H
 #define POINCARE_EVALUATION_H
 
-#include <complex>
+#include <complex.h>
 extern "C" {
 #include <stdint.h>
 }
-#include <poincare/expression.h>
+#include <poincare/preferences.h>
+#include <poincare/tree_handle.h>
+#include <poincare/tree_node.h>
 
 namespace Poincare {
 
+class Expression;
 template<typename T>
-class Evaluation {
+class Evaluation;
+
+template<typename T>
+class EvaluationNode : public TreeNode {
 public:
   enum class Type : uint8_t {
+    Exception,
     Complex,
     MatrixComplex
   };
+  EvaluationNode<T> * childAtIndex(int index) const override { return static_cast<EvaluationNode<T> *>(TreeNode::childAtIndex(index)); }
+  Direct<EvaluationNode<T> > children() const { return Direct<EvaluationNode<T> >(this); }
   virtual Type type() const = 0;
-  virtual ~Evaluation() {}
+  virtual ~EvaluationNode() = default;
   virtual bool isUndefined() const = 0;
   virtual T toScalar() const { return NAN; }
-  virtual Expression * complexToExpression(Expression::ComplexFormat complexFormat) const = 0;
-  virtual std::complex<T> createTrace() const = 0;
-  virtual std::complex<T> createDeterminant() const = 0;
-  virtual Evaluation * createInverse() const = 0;
-  virtual Evaluation * createTranspose() const = 0;
+  virtual Expression complexToExpression(Preferences::ComplexFormat complexFormat) const = 0;
+  virtual std::complex<T> trace() const = 0;
+  virtual std::complex<T> determinant() const = 0;
 };
 
 template<typename T>
-class Complex : public std::complex<T>, public Evaluation<T> {
+class Evaluation : public TreeHandle {
 public:
-  Complex(T a, T b = 0.0) : std::complex<T>(a, b) {}
-  Complex(std::complex<T> c) : std::complex<T>(c) {
-    if (this->real() == -0) {
-      this->real(0);
-    }
-    if (this->imag() == -0) {
-      this->imag(0);
-    }
+  Evaluation() : TreeHandle() {}
+#if 0
+  template<class U> U convert() const {
+    /* This function allows to convert Evaluation to derived Evaluation.
+     *
+     * We could have overriden the operator T(). However, even with the
+     * 'explicit' keyword (which prevents implicit casts), direct initilization
+     * are enable which can lead to weird code:
+     * ie, you can write: 'Complex<float> a(2); MatrixComplex<float> b(a);'
+     * */
+    static_assert(sizeof(U) == sizeof(Evaluation), "Size mismatch");
+    return *reinterpret_cast<U *>(const_cast<Evaluation<T> *>(this));
   }
-  static Complex Undefined() {
-    return Complex(NAN, NAN);
+#endif
+  EvaluationNode<T> * node() const {
+    assert(!TreeHandle::node()->isGhost());
+    return static_cast<EvaluationNode<T> *>(TreeHandle::node());
   }
-  virtual ~Complex() {}
-  typename Poincare::Evaluation<T>::Type type() const override { return Poincare::Evaluation<T>::Type::Complex; }
-  bool isUndefined() const override {
-    return (std::isnan(this->real()) && std::isnan(this->imag()));
-  }
-  T toScalar() const override;
-  Expression * complexToExpression(Expression::ComplexFormat complexFormat) const override;
-  std::complex<T> createTrace() const override { return *this; }
-  std::complex<T> createDeterminant() const override { return *this; }
-  Complex<T> * createInverse() const override;
-  Complex<T> * createTranspose() const override { return new Complex<T>(*this); }
-};
 
-template<typename T>
-class MatrixComplex : public Evaluation<T> {
-public:
-  MatrixComplex(std::complex<T> * operands, int numberOfRows, int numberOfColumns);
-  static MatrixComplex Undefined() {
-    std::complex<T> undef = std::complex<T>(NAN, NAN);
-    return MatrixComplex<T>(&undef, 1, 1);
-  }
-  ~MatrixComplex();
-  MatrixComplex(MatrixComplex&& other); // C++11 move constructor
-  MatrixComplex& operator=(MatrixComplex&& other); // C++11 move assignment operator
-  MatrixComplex(const MatrixComplex& other); // C++11 copy constructor
-  MatrixComplex& operator=(const MatrixComplex& other) = delete; // C++11 copy assignment operator
-
-  typename Poincare::Evaluation<T>::Type type() const override { return Poincare::Evaluation<T>::Type::MatrixComplex; }
-  const std::complex<T> complexOperand(int i) const { return m_operands[i]; }
-  int numberOfComplexOperands() const { return m_numberOfRows*m_numberOfColumns; }
-  int numberOfRows() const { return m_numberOfRows; }
-  int numberOfColumns() const { return m_numberOfColumns; }
-  bool isUndefined() const override {
-    return (numberOfRows() == 1 && numberOfColumns() == 1 && std::isnan(complexOperand(0).real()) && std::isnan(complexOperand(0).imag()));
-  }
-  Expression * complexToExpression(Expression::ComplexFormat complexFormat) const override;
-  std::complex<T> createTrace() const override;
-  std::complex<T> createDeterminant() const override;
-  MatrixComplex<T> * createInverse() const override;
-  MatrixComplex<T> * createTranspose() const override;
-  static MatrixComplex<T> createIdentity(int dim);
-private:
-  std::complex<T> * m_operands;
-  int m_numberOfRows;
-  int m_numberOfColumns;
+  /* Hierarchy */
+  Evaluation<T> childAtIndex(int i) const;
+  typename Poincare::EvaluationNode<T>::Type type() const { return node()->type(); }
+  bool isUndefined() const { return node()->isUndefined(); }
+  T toScalar() const { return node()->toScalar(); }
+  Expression complexToExpression(Preferences::ComplexFormat complexFormat) const;
+  std::complex<T> trace() const { return node()->trace(); }
+  std::complex<T> determinant() const { return node()->determinant(); }
+protected:
+  Evaluation(EvaluationNode<T> * n) : TreeHandle(n) {}
 };
 
 }

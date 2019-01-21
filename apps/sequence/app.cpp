@@ -26,29 +26,28 @@ App::Snapshot::Snapshot() :
 }
 
 App * App::Snapshot::unpack(Container * container) {
-  return new App(container, this);
+  return new (container->currentAppBuffer()) App(container, this);
 }
 
 void App::Snapshot::reset() {
   FunctionApp::Snapshot::reset();
+  /* reset might be called when activating the exam mode from the settings or
+   * when a memory exception occurs. In both cases, we do not want to
+   * computeYAuto in GraphRange::setDefault, so we need to set its delegate to
+   * nullptr. */
+  m_graphRange.setDelegate(nullptr);
   m_graphRange.setDefault();
-  /* We do not need to invalidate the sequence context cache here as the
-   * context is not allocated yet when reset is call (from the application
-   * settings). */
+  /* We do not need to invalidate the sequence context cache here:
+   * - The context is not allocated yet when reset is call from the application
+   *   settings.
+   * - The cache will be destroyed if the reset call comes from a memory
+   *   exception. */
   m_sequenceStore.removeAll();
 }
 
 App::Descriptor * App::Snapshot::descriptor() {
   static Descriptor descriptor;
   return &descriptor;
-}
-
-SequenceStore * App::Snapshot::sequenceStore() {
-  return &m_sequenceStore;
-}
-
-CurveViewRange * App::Snapshot::graphRange() {
-  return &m_graphRange;
 }
 
 void App::Snapshot::tidy() {
@@ -59,20 +58,20 @@ void App::Snapshot::tidy() {
 App::App(Container * container, Snapshot * snapshot) :
   FunctionApp(container, snapshot, &m_inputViewController),
   m_sequenceContext(((AppsContainer *)container)->globalContext(), snapshot->sequenceStore()),
-  m_listController(&m_listFooter, snapshot->sequenceStore(), &m_listHeader, &m_listFooter),
+  m_listController(&m_listFooter, this, snapshot->sequenceStore(), &m_listHeader, &m_listFooter),
   m_listFooter(&m_listHeader, &m_listController, &m_listController, ButtonRowController::Position::Bottom, ButtonRowController::Style::EmbossedGrey),
   m_listHeader(nullptr, &m_listFooter, &m_listController),
   m_listStackViewController(&m_tabViewController, &m_listHeader),
-  m_graphController(&m_graphAlternateEmptyViewController, snapshot->sequenceStore(), snapshot->graphRange(), snapshot->cursor(), snapshot->indexFunctionSelectedByCursor(), snapshot->modelVersion(), snapshot->rangeVersion(), snapshot->angleUnitVersion(), &m_graphHeader),
+  m_graphController(&m_graphAlternateEmptyViewController, this, snapshot->sequenceStore(), snapshot->graphRange(), snapshot->cursor(), snapshot->indexFunctionSelectedByCursor(), snapshot->modelVersion(), snapshot->rangeVersion(), snapshot->angleUnitVersion(), &m_graphHeader),
   m_graphAlternateEmptyViewController(&m_graphHeader, &m_graphController, &m_graphController),
   m_graphHeader(&m_graphStackViewController, &m_graphAlternateEmptyViewController, &m_graphController),
   m_graphStackViewController(&m_tabViewController, &m_graphHeader),
-  m_valuesController(&m_valuesAlternateEmptyViewController, snapshot->sequenceStore(), snapshot->interval(), &m_valuesHeader),
+  m_valuesController(&m_valuesAlternateEmptyViewController, this, snapshot->sequenceStore(), snapshot->interval(), &m_valuesHeader),
   m_valuesAlternateEmptyViewController(&m_valuesHeader, &m_valuesController, &m_valuesController),
   m_valuesHeader(nullptr, &m_valuesAlternateEmptyViewController, &m_valuesController),
   m_valuesStackViewController(&m_tabViewController, &m_valuesHeader),
   m_tabViewController(&m_inputViewController, snapshot, &m_listStackViewController, &m_graphStackViewController, &m_valuesStackViewController),
-  m_inputViewController(&m_modalViewController, &m_tabViewController, &m_listController, &m_listController)
+  m_inputViewController(&m_modalViewController, &m_tabViewController, &m_listController, &m_listController, &m_listController)
 {
 }
 
@@ -84,8 +83,8 @@ SequenceContext * App::localContext() {
   return &m_sequenceContext;
 }
 
-const char * App::XNT() {
-  return "n";
+char App::XNT() {
+  return 'n';
 }
 
 }

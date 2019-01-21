@@ -2,70 +2,74 @@
 #include "../../shared/poincare_helpers.h"
 #include <math.h>
 #include <assert.h>
-#include "../../poincare/include/poincare_layouts.h"
+#include <poincare/char_layout.h>
+#include <poincare/horizontal_layout.h>
+#include <poincare/vertical_offset_layout.h>
+#include <poincare/decimal.h>
+#include <poincare/number.h>
+#include <poincare/symbol.h>
+#include <poincare/addition.h>
+#include <poincare/multiplication.h>
+#include <poincare/power.h>
 
 using namespace Poincare;
 using namespace Shared;
 
 namespace Regression {
 
-ExpressionLayout * CubicModel::layout() {
-  static ExpressionLayout * layout = nullptr;
-  if (layout == nullptr) {
-    const ExpressionLayout * layoutChildren[] = {
-      new CharLayout('a', KDText::FontSize::Small),
-      new CharLayout(Ion::Charset::MiddleDot, KDText::FontSize::Small),
-      new CharLayout('X', KDText::FontSize::Small),
-      new VerticalOffsetLayout(
-          new CharLayout('3', KDText::FontSize::Small),
-          VerticalOffsetLayout::Type::Superscript,
-          false),
-      new CharLayout('+', KDText::FontSize::Small),
-      new CharLayout('b', KDText::FontSize::Small),
-      new CharLayout(Ion::Charset::MiddleDot, KDText::FontSize::Small),
-      new CharLayout('X', KDText::FontSize::Small),
-      new VerticalOffsetLayout(
-          new CharLayout('2', KDText::FontSize::Small),
-          VerticalOffsetLayout::Type::Superscript,
-          false),
-      new CharLayout('+', KDText::FontSize::Small),
-      new CharLayout('c', KDText::FontSize::Small),
-      new CharLayout(Ion::Charset::MiddleDot, KDText::FontSize::Small),
-      new CharLayout('X', KDText::FontSize::Small),
-      new CharLayout('+', KDText::FontSize::Small),
-      new CharLayout('d', KDText::FontSize::Small),
+Layout CubicModel::layout() {
+  if (m_layout.isUninitialized()) {
+    const Layout layoutChildren[] = {
+      CharLayout('a', KDFont::SmallFont),
+      CharLayout(Ion::Charset::MiddleDot, KDFont::SmallFont),
+      CharLayout('X', KDFont::SmallFont),
+      VerticalOffsetLayout(
+          CharLayout('3', KDFont::SmallFont),
+          VerticalOffsetLayoutNode::Type::Superscript
+        ),
+      CharLayout('+', KDFont::SmallFont),
+      CharLayout('b', KDFont::SmallFont),
+      CharLayout(Ion::Charset::MiddleDot, KDFont::SmallFont),
+      CharLayout('X', KDFont::SmallFont),
+      VerticalOffsetLayout(
+          CharLayout('2', KDFont::SmallFont),
+          VerticalOffsetLayoutNode::Type::Superscript
+        ),
+      CharLayout('+', KDFont::SmallFont),
+      CharLayout('c', KDFont::SmallFont),
+      CharLayout(Ion::Charset::MiddleDot, KDFont::SmallFont),
+      CharLayout('X', KDFont::SmallFont),
+      CharLayout('+', KDFont::SmallFont),
+      CharLayout('d', KDFont::SmallFont),
     };
-    layout = new HorizontalLayout(layoutChildren, 15, false);
+    m_layout = HorizontalLayout(layoutChildren, 15);
   }
-  return layout;
+  return m_layout;
 }
 
-Expression * CubicModel::simplifiedExpression(double * modelCoefficients, Poincare::Context * context) {
+Expression CubicModel::simplifiedExpression(double * modelCoefficients, Poincare::Context * context) {
   double a = modelCoefficients[0];
   double b = modelCoefficients[1];
   double c = modelCoefficients[2];
   double d = modelCoefficients[3];
-  Expression * ax3Expression = new Multiplication(
-      new Decimal(a),
-      new Power(
-        new Symbol('x'),
-        new Decimal(3.0),
-        false),
-      false);
-  Expression * bx2Expression = new Multiplication(
-    new Decimal(b),
-    new Power(
-      new Symbol('x'),
-      new Decimal(2.0),
-      false),
-    false);
-  Expression * cxExpression = new Multiplication(
-    new Decimal(c),
-    new Symbol('x'),
-    false);
-  Expression * dExpression = new Decimal(d);
-  Expression * const operands[] = {ax3Expression, bx2Expression, cxExpression, dExpression};
-  Expression * result = new Addition(operands, 4, false);
+  Expression addChildren[] = {
+    Multiplication(
+      Number::DecimalNumber(a),
+      Power(
+        Symbol('x'),
+        Decimal(3.0))),
+    Multiplication(
+      Number::DecimalNumber(b),
+      Power(
+        Symbol('x'),
+        Decimal(2.0))),
+    Multiplication(
+      Number::DecimalNumber(c),
+      Symbol('x')),
+    Number::DecimalNumber(d)
+    };
+  // a*x^3+b*x^2+c*x+d
+  Expression result = Addition(addChildren, 4);
   PoincareHelpers::Simplify(&result, *context);
   return result;
 }

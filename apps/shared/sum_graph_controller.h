@@ -14,7 +14,7 @@ namespace Shared {
 
 class SumGraphController : public SimpleInteractiveCurveViewController, public TextFieldDelegate {
 public:
-  SumGraphController(Responder * parentResponder, FunctionGraphView * curveView, InteractiveCurveViewRange * range, CurveViewCursor * cursor, char sumSymbol);
+  SumGraphController(Responder * parentResponder, InputEventHandlerDelegate * inputEventHandlerDelegate, FunctionGraphView * curveView, InteractiveCurveViewRange * range, CurveViewCursor * cursor, char sumSymbol);
   void viewWillAppear() override;
   void didEnterResponderChain(Responder * previousFirstResponder) override;
   bool handleEvent(Ion::Events::Event event) override;
@@ -39,7 +39,7 @@ private:
   constexpr static float k_cursorBottomMarginRatio = 0.28f; // (cursorHeight/2+bannerHeigh)/graphViewHeight
   virtual I18n::Message legendMessageAtStep(Step step) = 0;
   virtual double cursorNextStep(double position, int direction) = 0;
-  virtual Poincare::ExpressionLayout * createFunctionLayout(const char * functionName) = 0;
+  virtual Poincare::Layout createFunctionLayout(const char * functionName) = 0;
   Shared::InteractiveCurveViewRange * interactiveCurveViewRange() override { return m_graphRange; }
   Shared::CurveView * curveView() override { return m_graphView; }
   TextFieldDelegateApp * textFieldDelegateApp() override {
@@ -48,8 +48,7 @@ private:
   bool handleEnter() override;
   class LegendView : public View {
   public:
-    LegendView(SumGraphController * controller, char sumSymbol);
-    ~LegendView();
+    LegendView(SumGraphController * controller, InputEventHandlerDelegate * inputEventHandlerDelegate, char sumSymbol);
     LegendView(const LegendView& other) = delete;
     LegendView(LegendView&& other) = delete;
     LegendView& operator=(const LegendView& other) = delete;
@@ -59,11 +58,9 @@ private:
     void drawRect(KDContext * ctx, KDRect rect) const override;
     void setLegendMessage(I18n::Message message, Step step);
     void setEditableZone(double d);
-    void setSumSymbol(Step step, double start = NAN, double end = NAN, double result = NAN, Poincare::ExpressionLayout * sequenceName = nullptr);
+    void setSumSymbol(Step step, double start = NAN, double end = NAN, double result = NAN, Poincare::Layout sequenceName = Poincare::Layout());
   private:
     constexpr static KDCoordinate k_legendHeight = 35;
-    constexpr static KDCoordinate k_editableZoneWidth = 12*KDText::charSize(KDText::FontSize::Small).width();
-    constexpr static KDCoordinate k_editableZoneHeight = KDText::charSize(KDText::FontSize::Small).height();
     constexpr static KDCoordinate k_symbolHeightMargin = 8;
     constexpr static KDCoordinate k_sigmaHeight = 18;
     int numberOfSubviews() const override;
@@ -71,7 +68,7 @@ private:
     void layoutSubviews() override;
     void layoutSubviews(Step step);
     ExpressionView m_sum;
-    Poincare::ExpressionLayout * m_sumLayout;
+    Poincare::Layout m_sumLayout;
     MessageTextView m_legend;
     TextField m_editableZone;
     char m_draftText[TextField::maxBufferSize()];

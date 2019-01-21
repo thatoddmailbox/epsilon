@@ -1,6 +1,6 @@
 #include <quiz.h>
-#include <ion.h>
 #include <poincare_layouts.h>
+#include <ion.h>
 #include <assert.h>
 #include "helper.h"
 
@@ -12,21 +12,20 @@ QUIZ_CASE(poincare_parenthesis_layout_size) {
    *      4
    * Assert that the first and last parentheses have the same size.
    */
-  HorizontalLayout * layout = new HorizontalLayout();
-  LeftParenthesisLayout leftPar = new LeftParenthesisLayout();
-  RightParenthesisLayout rightPar = new RightParenthesisLayout();
-  layout->addChildAtIndex(leftPar, 0);
-  layout->addChildAtIndex(new CharLayout('2'), 1);
-  layout->addChildAtIndex(new CharLayout('+'), 2);
-  layout->addChildAtIndex(new LeftParenthesisLayout(), 3);
-  layout->addChildAtIndex(new FractionLayout(
-        new CharLayout('3'),
-        new CharLayout('4')),
-      4);
-  layout->addChildAtIndex(new RightParenthesisLayout(), 3);
-  layout->addChildAtIndex(new CharLayout('6'), 5);
-  layout->addChildAtIndex(rightPar, 7);
-  layout->addChildAtIndex(new CharLayout('1'), 8);
-  assert(leftPar->size().height() == rightPar->size().height());
-  delete layout;
+  HorizontalLayout layout = HorizontalLayout();
+  LeftParenthesisLayout leftPar = LeftParenthesisLayout();
+  RightParenthesisLayout rightPar = RightParenthesisLayout();
+  layout.addChildAtIndex(leftPar, 0, 0, nullptr);
+  layout.addChildAtIndex(CharLayout('2'), 1, 1, nullptr);
+  layout.addChildAtIndex(CharLayout('+'), 2, 2, nullptr);
+  layout.addChildAtIndex(LeftParenthesisLayout(), 3, 3, nullptr);
+  layout.addChildAtIndex(FractionLayout(
+        CharLayout('3'),
+        CharLayout('4')),
+      4, 4, nullptr);
+  layout.addChildAtIndex(RightParenthesisLayout(), 4, 4, nullptr);
+  layout.addChildAtIndex(CharLayout('6'), 5, 5, nullptr);
+  layout.addChildAtIndex(rightPar, 7, 7, nullptr);
+  layout.addChildAtIndex(CharLayout('1'), 8, 8, nullptr);
+  quiz_assert(leftPar.layoutSize().height() == rightPar.layoutSize().height());
 }

@@ -10,7 +10,6 @@ objs += $(addprefix escher/src/,\
   chevron_view.o\
   clipboard.o\
   container.o\
-  dynamic_view_controller.o\
   editable_text_cell.o\
   ellipsis_view.o\
   expression_field.o\
@@ -22,13 +21,16 @@ objs += $(addprefix escher/src/,\
   even_odd_message_text_cell.o\
   expression_table_cell.o\
   expression_table_cell_with_pointer.o\
+  expression_table_cell_with_expression.o\
   expression_view.o\
   highlight_cell.o\
   gauge_view.o\
   image_view.o\
+  input_event_handler.o\
   invocation.o\
   input_view_controller.o\
   key_view.o\
+  layout_field.o\
   list_view_data_source.o\
   message_table_cell.o\
   message_table_cell_with_buffer.o\
@@ -43,6 +45,7 @@ objs += $(addprefix escher/src/,\
   message_text_view.o\
   message_tree.o\
   modal_view_controller.o\
+  nested_menu_controller.o\
   palette.o\
   pointer_text_view.o\
   responder.o\
@@ -51,8 +54,6 @@ objs += $(addprefix escher/src/,\
   scroll_view_data_source.o\
   scroll_view_indicator.o\
   scrollable_view.o\
-  expression_layout_field.o\
-  expression_layout_field_content_view.o\
   selectable_table_view.o\
   selectable_table_view_data_source.o\
   selectable_table_view_delegate.o\
@@ -88,9 +89,9 @@ objs += $(addprefix escher/src/,\
 
 INLINER := escher/image/inliner
 
-$(INLINER): escher/image/inliner.c
+$(INLINER): escher/image/inliner.c $(addprefix ion/src/external/lz4/, lz4.c lz4hc.c)
 	@echo "HOSTCC  $@"
-	$(Q) $(HOSTCC) -std=c99 `libpng-config --cflags` $< `libpng-config --ldflags` -o $@
+	$(Q) $(HOSTCC) -std=c99 `libpng-config --cflags` $^ `libpng-config --ldflags` -o $@
 
 %.h %.cpp : %.png $(INLINER)
 	@echo "INLINER $@"

@@ -1,41 +1,38 @@
 #include <poincare/parenthesis.h>
-
-extern "C" {
-#include <assert.h>
-#include <stdlib.h>
-}
+#include <poincare/layout_helper.h>
+#include <poincare/serialization_helper.h>
 
 namespace Poincare {
 
-
-Expression::Type Parenthesis::type() const {
-  return Type::Parenthesis;
+int ParenthesisNode::polynomialDegree(Context & context, const char * symbolName) const {
+  return childAtIndex(0)->polynomialDegree(context, symbolName);
 }
 
-Expression * Parenthesis::clone() const {
-  Parenthesis * o = new Parenthesis(m_operands, true);
-  return o;
+Layout ParenthesisNode::createLayout(Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const {
+  return LayoutHelper::Parentheses(childAtIndex(0)->createLayout(floatDisplayMode, numberOfSignificantDigits), false);
 }
 
-int Parenthesis::polynomialDegree(char symbolName) const {
-  return operand(0)->polynomialDegree(symbolName);
+int ParenthesisNode::serialize(char * buffer, int bufferSize, Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const {
+  return SerializationHelper::Prefix(this, buffer, bufferSize, floatDisplayMode, numberOfSignificantDigits, "");
 }
 
-ExpressionLayout * Parenthesis::createLayout(PrintFloat::Mode floatDisplayMode, int numberOfSignificantDigits) const {
-  return LayoutEngine::createParenthesedLayout(operand(0)->createLayout(floatDisplayMode, numberOfSignificantDigits), false);
-}
-
-Expression * Parenthesis::shallowReduce(Context& context, AngleUnit angleUnit) {
-  Expression * e = Expression::shallowReduce(context, angleUnit);
-  if (e != this) {
-    return e;
-  }
-  return replaceWith(editableOperand(0), true);
+Expression ParenthesisNode::shallowReduce(Context & context, Preferences::AngleUnit angleUnit, bool replaceSymbols) {
+  return Parenthesis(this).shallowReduce(context, angleUnit, replaceSymbols);
 }
 
 template<typename T>
-Evaluation<T> * Parenthesis::templatedApproximate(Context& context, AngleUnit angleUnit) const {
-  return operand(0)->privateApproximate(T(), context, angleUnit);
+Evaluation<T> ParenthesisNode::templatedApproximate(Context& context, Preferences::AngleUnit angleUnit) const {
+  return childAtIndex(0)->approximate(T(), context, angleUnit);
+}
+
+Expression Parenthesis::shallowReduce(Context & context, Preferences::AngleUnit angleUnit, bool replaceSymbols) {
+  Expression e = Expression::defaultShallowReduce(context, angleUnit);
+  if (e.isUndefined()) {
+    return e;
+  }
+  Expression c = childAtIndex(0);
+  replaceWithInPlace(c);
+  return c;
 }
 
 }

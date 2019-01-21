@@ -1,39 +1,55 @@
 #ifndef POINCARE_COMPLEX_ARGUMENT_H
 #define POINCARE_COMPLEX_ARGUMENT_H
 
-#include <poincare/layout_engine.h>
-#include <poincare/static_hierarchy.h>
-#include <poincare/approximation_engine.h>
+#include <poincare/approximation_helper.h>
+#include <poincare/expression.h>
 
 namespace Poincare {
 
-class ComplexArgument : public StaticHierarchy<1>  {
-  using StaticHierarchy<1>::StaticHierarchy;
+class ComplexArgumentNode final : public ExpressionNode  {
 public:
-  Type type() const override;
-  Expression * clone() const override;
+
+  // TreeNode
+  size_t size() const override { return sizeof(ComplexArgumentNode); }
+  int numberOfChildren() const override;
+#if POINCARE_TREE_LOG
+  virtual void logNodeName(std::ostream & stream) const override {
+    stream << "ComplexArgument";
+  }
+#endif
+
+  // Properties
+  Type type() const override { return Type::ComplexArgument; }
 private:
-  /* Layout */
-  ExpressionLayout * createLayout(PrintFloat::Mode floatDisplayMode, int numberOfSignificantDigits) const override {
-    return LayoutEngine::createPrefixLayout(this, floatDisplayMode, numberOfSignificantDigits, name());
+  // Layout
+  Layout createLayout(Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const override;
+  int serialize(char * buffer, int bufferSize, Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const override;
+  // Simplification
+  Expression shallowReduce(Context & context, Preferences::AngleUnit angleUnit, bool replaceSymbols = true) override;
+  // Evaluation
+  template<typename T> static Complex<T> computeOnComplex(const std::complex<T> c, Preferences::AngleUnit angleUnit);
+  Evaluation<float> approximate(SinglePrecision p, Context& context, Preferences::AngleUnit angleUnit) const override {
+    return ApproximationHelper::Map<float>(this, context, angleUnit,computeOnComplex<float>);
   }
-  int writeTextInBuffer(char * buffer, int bufferSize, PrintFloat::Mode floatDisplayMode, int numberOfSignificantDigits) const override {
-    return LayoutEngine::writePrefixExpressionTextInBuffer(this, buffer, bufferSize, floatDisplayMode, numberOfSignificantDigits, name());
+  Evaluation<double> approximate(DoublePrecision p, Context& context, Preferences::AngleUnit angleUnit) const override {
+    return ApproximationHelper::Map<double>(this, context, angleUnit, computeOnComplex<double>);
   }
-  const char * name() const { return "arg"; }
-  /* Simplification */
-  Expression * shallowReduce(Context& context, AngleUnit angleUnit) override;
-  /* Evaluation */
-  template<typename T> static std::complex<T> computeOnComplex(const std::complex<T> c, AngleUnit angleUnit);
-  Evaluation<float> * privateApproximate(SinglePrecision p, Context& context, AngleUnit angleUnit) const override {
-    return ApproximationEngine::map<float>(this, context, angleUnit,computeOnComplex<float>);
-  }
-  Evaluation<double> * privateApproximate(DoublePrecision p, Context& context, AngleUnit angleUnit) const override {
-    return ApproximationEngine::map<double>(this, context, angleUnit, computeOnComplex<double>);
+};
+
+class ComplexArgument final : public Expression {
+public:
+  ComplexArgument(const ComplexArgumentNode * n) : Expression(n) {}
+  static ComplexArgument Builder(Expression child) { return ComplexArgument(child); }
+  static Expression UntypedBuilder(Expression children) { return Builder(children.childAtIndex(0)); }
+  static constexpr Expression::FunctionHelper s_functionHelper = Expression::FunctionHelper("arg", 1, &UntypedBuilder);
+
+  Expression shallowReduce(Context & context, Preferences::AngleUnit angleUnit, bool replaceSymbols = true);
+private:
+  explicit ComplexArgument(Expression child) : Expression(TreePool::sharedPool()->createTreeNode<ComplexArgumentNode>()) {
+    replaceChildAtIndexInPlace(0, child);
   }
 };
 
 }
 
 #endif
-

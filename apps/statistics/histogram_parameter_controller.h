@@ -9,7 +9,7 @@ namespace Statistics {
 
 class HistogramParameterController : public Shared::FloatParameterController {
 public:
-  HistogramParameterController(Responder * parentResponder, Store * store);
+  HistogramParameterController(Responder * parentResponder, InputEventHandlerDelegate * inputEventHandlerDelegateApp, Store * store);
   const char * title() override;
   int numberOfRows() override { return 1+k_numberOfCells; }
   void willDisplayCellForIndex(HighlightCell * cell, int index) override;
@@ -19,10 +19,8 @@ private:
   int reusableParameterCellCount(int type) override { return k_numberOfCells; }
   double parameterAtIndex(int index) override;
   bool setParameterAtIndex(int parameterIndex, double f) override;
-  View * loadView() override;
-  void unloadView(View * view) override;
   char m_draftTextBuffer[MessageTableCellWithEditableText::k_bufferLength];
-  MessageTableCellWithEditableText * m_cells[k_numberOfCells];
+  MessageTableCellWithEditableText m_cells[k_numberOfCells];
   Store * m_store;
 };
 

@@ -6,14 +6,14 @@ using namespace Poincare;
 
 namespace Sequence {
 
-SequenceTitleCell::SequenceTitleCell(Orientation orientation) :
-  Shared::FunctionTitleCell(orientation),
+SequenceTitleCell::SequenceTitleCell() :
+  Shared::FunctionTitleCell(),
   m_titleTextView(0.5f, 0.5f)
 {
 }
 
-void SequenceTitleCell::setExpressionLayout(Poincare::ExpressionLayout * expressionLayout) {
-  m_titleTextView.setExpressionLayout(expressionLayout);
+void SequenceTitleCell::setLayout(Poincare::Layout layout) {
+  m_titleTextView.setLayout(layout);
 }
 
 void SequenceTitleCell::setHighlighted(bool highlight) {

@@ -10,7 +10,7 @@ namespace Sequence {
 
 class ValuesController : public Shared::ValuesController {
 public:
-  ValuesController(Responder * parentResponder, SequenceStore * sequenceStore, Shared::Interval * interval, ButtonRowController * header);
+  ValuesController(Responder * parentResponder, InputEventHandlerDelegate * inputEventHandlerDelegate, SequenceStore * sequenceStore, Shared::Interval * interval, ButtonRowController * header);
   void willDisplayCellAtLocation(HighlightCell * cell, int i, int j) override;
   I18n::Message emptyMessage() override;
   IntervalParameterController * intervalParameterController() override;
@@ -20,14 +20,12 @@ private:
   int maxNumberOfFunctions() override;
   constexpr static int k_maxNumberOfCells = 30;
   constexpr static int k_maxNumberOfSequences = 3;
-  SequenceTitleCell * m_sequenceTitleCells[k_maxNumberOfSequences];
+  SequenceTitleCell m_sequenceTitleCells[k_maxNumberOfSequences];
   SequenceTitleCell * functionTitleCells(int j) override;
-  EvenOddBufferTextCell * m_floatCells[k_maxNumberOfCells];
+  EvenOddBufferTextCell m_floatCells[k_maxNumberOfCells];
   EvenOddBufferTextCell * floatCells(int j) override;
   SequenceStore * m_sequenceStore;
   SequenceStore * functionStore() const override;
-  View * loadView() override;
-  void unloadView(View * view) override;
 #if COPY_COLUMN
   Shared::ValuesFunctionParameterController m_sequenceParameterController;
 #endif

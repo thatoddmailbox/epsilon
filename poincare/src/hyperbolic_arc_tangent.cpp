@@ -1,38 +1,23 @@
 #include <poincare/hyperbolic_arc_tangent.h>
-#include <poincare/simplification_engine.h>
-#include <poincare/trigonometry.h>
-extern "C" {
-#include <assert.h>
-}
+#include <poincare/complex.h>
+#include <poincare/layout_helper.h>
+#include <poincare/serialization_helper.h>
 #include <cmath>
 
 namespace Poincare {
 
-Expression::Type HyperbolicArcTangent::type() const {
-  return Type::HyperbolicArcTangent;
+constexpr Expression::FunctionHelper HyperbolicArcTangent::s_functionHelper;
+
+Layout HyperbolicArcTangentNode::createLayout(Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const {
+  return LayoutHelper::Prefix(HyperbolicArcTangent(this), floatDisplayMode, numberOfSignificantDigits, HyperbolicArcTangent::s_functionHelper.name());
 }
 
-Expression * HyperbolicArcTangent::clone() const {
-  HyperbolicArcTangent * a = new HyperbolicArcTangent(m_operands, true);
-  return a;
-}
-
-Expression * HyperbolicArcTangent::shallowReduce(Context& context, AngleUnit angleUnit) {
-  Expression * e = Expression::shallowReduce(context, angleUnit);
-  if (e != this) {
-    return e;
-  }
-#if MATRIX_EXACT_REDUCING
-  Expression * op = editableOperand(0);
-  if (op->type() == Type::Matrix) {
-    return SimplificationEngine::map(this, context, angleUnit);
-  }
-#endif
-  return this;
+int HyperbolicArcTangentNode::serialize(char * buffer, int bufferSize, Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const {
+  return SerializationHelper::Prefix(this, buffer, bufferSize, floatDisplayMode, numberOfSignificantDigits, HyperbolicArcTangent::s_functionHelper.name());
 }
 
 template<typename T>
-std::complex<T> HyperbolicArcTangent::computeOnComplex(const std::complex<T> c, AngleUnit angleUnit) {
+Complex<T> HyperbolicArcTangentNode::computeOnComplex(const std::complex<T> c, Preferences::AngleUnit angleUnit) {
   std::complex<T> result = std::atanh(c);
   /* atanh has a branch cut on ]-inf, -1[U]1, +inf[: it is then multivalued on
    * this cut. We followed the convention chosen by the lib c++ of llvm on
@@ -42,7 +27,10 @@ std::complex<T> HyperbolicArcTangent::computeOnComplex(const std::complex<T> c, 
   if (c.imag() == 0 && c.real() > 1) {
     result.imag(-result.imag()); // other side of the cut
   }
-  return Trigonometry::RoundToMeaningfulDigits(result);
+  return Complex<T>(Trigonometry::RoundToMeaningfulDigits(result, c));
 }
+
+template Complex<float> Poincare::HyperbolicArcTangentNode::computeOnComplex<float>(std::complex<float>, Preferences::AngleUnit);
+template Complex<double> Poincare::HyperbolicArcTangentNode::computeOnComplex<double>(std::complex<double>, Preferences::AngleUnit);
 
 }

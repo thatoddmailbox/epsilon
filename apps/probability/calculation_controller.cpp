@@ -24,7 +24,7 @@ using namespace Shared;
 namespace Probability {
 
 CalculationController::ContentView::ContentView(SelectableTableView * selectableTableView, Law * law, Calculation * calculation) :
-  m_titleView(KDText::FontSize::Small, I18n::Message::ComputeProbability, 0.5f, 0.5f, Palette::GreyDark, Palette::WallScreen),
+  m_titleView(KDFont::SmallFont, I18n::Message::ComputeProbability, 0.5f, 0.5f, Palette::GreyDark, Palette::WallScreen),
   m_selectableTableView(selectableTableView),
   m_lawCurveView(law, calculation)
 {
@@ -46,14 +46,14 @@ View * CalculationController::ContentView::subviewAtIndex(int index) {
 }
 
 void CalculationController::ContentView::layoutSubviews() {
-  KDCoordinate titleHeight = KDText::charSize(KDText::FontSize::Small).height()+k_titleHeightMargin;
+  KDCoordinate titleHeight = KDFont::SmallFont->glyphSize().height()+k_titleHeightMargin;
   m_titleView.setFrame(KDRect(0, 0, bounds().width(), titleHeight));
   KDCoordinate calculationHeight = ResponderImageCell::k_oneCellHeight+2*k_tableMargin;
   m_selectableTableView->setFrame(KDRect(0,  titleHeight, bounds().width(), calculationHeight));
   m_lawCurveView.setFrame(KDRect(0,  titleHeight+calculationHeight, bounds().width(), bounds().height() - calculationHeight - titleHeight));
 }
 
-CalculationController::CalculationController(Responder * parentResponder, Law * law, Calculation * calculation) :
+CalculationController::CalculationController(Responder * parentResponder, InputEventHandlerDelegate * inputEventHandlerDelegate, Law * law, Calculation * calculation) :
   ViewController(parentResponder),
   m_contentView(&m_selectableTableView, law, calculation),
   m_selectableTableView(this),
@@ -72,7 +72,7 @@ CalculationController::CalculationController(Responder * parentResponder, Law * 
 
   for (int i = 0; i < k_numberOfCalculationCells; i++) {
     m_calculationCells[i].editableTextCell()->setParentResponder(&m_selectableTableView);
-    m_calculationCells[i].editableTextCell()->textField()->setDelegate(this);
+    m_calculationCells[i].editableTextCell()->textField()->setDelegates(inputEventHandlerDelegate, this);
     m_calculationCells[i].editableTextCell()->textField()->setDraftTextBuffer(m_draftTextBuffer);
   }
 }
@@ -182,13 +182,13 @@ void CalculationController::willDisplayCellAtLocation(HighlightCell * cell, int 
       return;
     }
     char buffer[PrintFloat::bufferSizeForFloatsWithPrecision(Constant::LargeNumberOfSignificantDigits)];
-    PrintFloat::convertFloatToText<double>(m_calculation->parameterAtIndex(i-1), buffer, PrintFloat::bufferSizeForFloatsWithPrecision(Constant::LargeNumberOfSignificantDigits), Constant::LargeNumberOfSignificantDigits, PrintFloat::Mode::Decimal);
+    PrintFloat::convertFloatToText<double>(m_calculation->parameterAtIndex(i-1), buffer, PrintFloat::bufferSizeForFloatsWithPrecision(Constant::LargeNumberOfSignificantDigits), Constant::LargeNumberOfSignificantDigits, Preferences::PrintFloatMode::Decimal);
     field->setText(buffer);
   }
 }
 
-bool CalculationController::textFieldDidHandleEvent(::TextField * textField, bool returnValue, bool textHasChanged) {
-  if (returnValue && textHasChanged) {
+bool CalculationController::textFieldDidHandleEvent(::TextField * textField, bool returnValue, bool textSizeDidChange) {
+  if (returnValue && textSizeDidChange) {
     /* We do not reload the responder because the first responder might be the
      * toolbox (or the variable  box) and reloading the responder would corrupt
      * the first responder. */
@@ -273,13 +273,23 @@ TextFieldDelegateApp * CalculationController::textFieldDelegateApp() {
 void CalculationController::updateTitle() {
   int currentChar = 0;
   for (int index = 0; index < m_law->numberOfParameter(); index++) {
+    if (currentChar >= k_maxNumberOfTitleCharacters) {
+      break;
+    }
     m_titleBuffer[currentChar++] = I18n::translate(m_law->parameterNameAtIndex(index))[0];
-    strlcpy(m_titleBuffer+currentChar, " = ", 4);
+    strlcpy(m_titleBuffer+currentChar, " = ", k_maxNumberOfTitleCharacters - currentChar);
     currentChar += 3;
-    char buffer[PrintFloat::bufferSizeForFloatsWithPrecision(Constant::ShortNumberOfSignificantDigits)];
-    PrintFloat::convertFloatToText<double>(m_law->parameterValueAtIndex(index), buffer, PrintFloat::bufferSizeForFloatsWithPrecision(Constant::ShortNumberOfSignificantDigits), Constant::ShortNumberOfSignificantDigits, PrintFloat::Mode::Decimal);
-    strlcpy(m_titleBuffer+currentChar, buffer, strlen(buffer)+1);
+    if (currentChar >= k_maxNumberOfTitleCharacters) {
+      break;
+    }
+    const size_t bufferSize = PrintFloat::bufferSizeForFloatsWithPrecision(Constant::ShortNumberOfSignificantDigits);
+    char buffer[bufferSize];
+    PrintFloat::convertFloatToText<double>(m_law->parameterValueAtIndex(index), buffer, PrintFloat::bufferSizeForFloatsWithPrecision(Constant::ShortNumberOfSignificantDigits), Constant::ShortNumberOfSignificantDigits, Preferences::PrintFloatMode::Decimal);
+    strlcpy(m_titleBuffer+currentChar, buffer, k_maxNumberOfTitleCharacters - currentChar);
     currentChar += strlen(buffer);
+    if (currentChar >= k_maxNumberOfTitleCharacters) {
+      break;
+    }
     m_titleBuffer[currentChar++] = ' ';
   }
   m_titleBuffer[currentChar-1] = 0;

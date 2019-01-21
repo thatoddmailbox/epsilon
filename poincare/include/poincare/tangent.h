@@ -1,37 +1,56 @@
 #ifndef POINCARE_TANGENT_H
 #define POINCARE_TANGENT_H
 
-#include <poincare/layout_engine.h>
-#include <poincare/static_hierarchy.h>
-#include <poincare/approximation_engine.h>
-#include <poincare/trigonometry.h>
+#include <poincare/approximation_helper.h>
+#include <poincare/expression.h>
 
 namespace Poincare {
 
-class Tangent : public StaticHierarchy<1>  {
-  using StaticHierarchy<1>::StaticHierarchy;
+class TangentNode final : public ExpressionNode {
 public:
-  Type type() const override;
-  Expression * clone() const override;
-  float characteristicXRange(Context & context, AngleUnit angleUnit) const override;
+
+  // TreeNode
+  size_t size() const override { return sizeof(TangentNode); }
+  int numberOfChildren() const override;
+#if POINCARE_TREE_LOG
+  virtual void logNodeName(std::ostream & stream) const override {
+    stream << "Tangent";
+  }
+#endif
+
+  // Properties
+  Type type() const override { return Type::Tangent; }
+  float characteristicXRange(Context & context, Preferences::AngleUnit angleUnit) const override;
+
 private:
-  /* Layout */
-  ExpressionLayout * createLayout(PrintFloat::Mode floatDisplayMode, int numberOfSignificantDigits) const override {
-    return LayoutEngine::createPrefixLayout(this, floatDisplayMode, numberOfSignificantDigits, name());
+  // Layout
+  Layout createLayout(Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const override;
+  int serialize(char * buffer, int bufferSize, Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const override;
+
+  // Simplication
+  Expression shallowReduce(Context & context, Preferences::AngleUnit angleUnit, bool replaceSymbols = true) override;
+
+  // Evaluation
+  template<typename T> static Complex<T> computeOnComplex(const std::complex<T> c, Preferences::AngleUnit angleUnit = Preferences::AngleUnit::Radian);
+  Evaluation<float> approximate(SinglePrecision p, Context& context, Preferences::AngleUnit angleUnit) const override {
+    return ApproximationHelper::Map<float>(this, context, angleUnit,computeOnComplex<float>);
   }
-  int writeTextInBuffer(char * buffer, int bufferSize, PrintFloat::Mode floatDisplayMode, int numberOfSignificantDigits) const override {
-    return LayoutEngine::writePrefixExpressionTextInBuffer(this, buffer, bufferSize, floatDisplayMode, numberOfSignificantDigits, name());
+  Evaluation<double> approximate(DoublePrecision p, Context& context, Preferences::AngleUnit angleUnit) const override {
+    return ApproximationHelper::Map<double>(this, context, angleUnit, computeOnComplex<double>);
   }
-  const char * name() const { return "tan"; }
-  /* Simplication */
-  Expression * shallowReduce(Context& context, AngleUnit angleUnit) override;
-  /* Evaluation */
-  template<typename T> static std::complex<T> computeOnComplex(const std::complex<T> c, AngleUnit angleUnit = AngleUnit::Radian);
-  Evaluation<float> * privateApproximate(SinglePrecision p, Context& context, AngleUnit angleUnit) const override {
-    return ApproximationEngine::map<float>(this, context, angleUnit,computeOnComplex<float>);
-  }
-  Evaluation<double> * privateApproximate(DoublePrecision p, Context& context, AngleUnit angleUnit) const override {
-    return ApproximationEngine::map<double>(this, context, angleUnit, computeOnComplex<double>);
+};
+
+class Tangent final : public Expression {
+public:
+  Tangent(const TangentNode * n) : Expression(n) {}
+  static Tangent Builder(Expression child) { return Tangent(child); }
+  static Expression UntypedBuilder(Expression children) { return Builder(children.childAtIndex(0)); }
+  static constexpr Expression::FunctionHelper s_functionHelper = Expression::FunctionHelper("tan", 1, &UntypedBuilder);
+
+  Expression shallowReduce(Context & context, Preferences::AngleUnit angleUnit, bool replaceSymbols = true);
+private:
+  explicit Tangent(Expression child) : Expression(TreePool::sharedPool()->createTreeNode<TangentNode>()) {
+    replaceChildAtIndexInPlace(0, child);
   }
 };
 

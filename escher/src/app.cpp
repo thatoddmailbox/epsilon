@@ -1,5 +1,6 @@
 #include <escher/app.h>
 #include <escher/window.h>
+#include <poincare/tree_pool.h>
 extern "C" {
 #include <assert.h>
 }
@@ -18,7 +19,8 @@ const Image * App::Descriptor::icon() {
 
 void App::Snapshot::pack(App * app) {
   tidy();
-  delete app;
+  app->~App();
+  assert(Poincare::TreePool::sharedPool()->numberOfNodes() == 0);
 }
 
 void App::Snapshot::reset() {
@@ -94,9 +96,9 @@ void App::dismissModalViewController() {
   m_modalViewController.dismissModalViewController();
 }
 
-void App::displayWarning(I18n::Message warningMessage) {
-  m_warningController.setLabel(warningMessage);
-  m_modalViewController.displayModalViewController(&m_warningController, 0.5f, 0.5f);
+void App::displayWarning(I18n::Message warningMessage1, I18n::Message warningMessage2, bool specialExitKeys) {
+  m_warningController.setLabel(warningMessage1, warningMessage2, specialExitKeys);
+  displayModalViewController(&m_warningController, 0.5f, 0.5f);
 }
 
 const Container * App::container() const {

@@ -7,7 +7,7 @@ namespace Probability {
 
 class CalculationCell : public HighlightCell {
 public:
-  CalculationCell(Responder * parentResponder = nullptr, char * draftTextBuffer = nullptr, TextFieldDelegate * textFieldDelegate = nullptr);
+  CalculationCell(Responder * parentResponder = nullptr, char * draftTextBuffer = nullptr, InputEventHandlerDelegate * inputEventHandlerDelegate = nullptr, TextFieldDelegate * textFieldDelegate = nullptr);
   Responder * responder() override;
   void setResponder(bool shouldbeResponder);
   void setHighlighted(bool highlight) override;
@@ -20,8 +20,6 @@ public:
   }
 private:
   constexpr static KDCoordinate k_margin = 5;
-  constexpr static KDCoordinate k_minTextFieldWidth = 4*KDText::charSize().width()+TextCursorView::k_width;
-  constexpr static KDCoordinate k_maxTextFieldWidth = 14*KDText::charSize().width()+TextCursorView::k_width;
   int numberOfSubviews() const override;
   View * subviewAtIndex(int index) override;
   void layoutSubviews() override;

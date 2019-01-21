@@ -12,17 +12,15 @@ namespace Regression {
 
 class StoreController : public Shared::StoreController {
 public:
-  StoreController(Responder * parentResponder, Store * store, ButtonRowController * header);
+  StoreController(Responder * parentResponder, InputEventHandlerDelegate * inputEventHandlerDelegate, Store * store, ButtonRowController * header);
   Shared::StoreContext * storeContext() override;
   void setFormulaLabel() override;
-  bool fillColumnWithFormula(Poincare::Expression * formula) override;
+  bool fillColumnWithFormula(Poincare::Expression formula) override;
   void willDisplayCellAtLocation(HighlightCell * cell, int i, int j) override;
 private:
   HighlightCell * titleCells(int index) override;
-  View * loadView() override;
-  void unloadView(View * view) override;
   Shared::StoreParameterController * storeParameterController() override { return &m_storeParameterController; }
-  Shared::StoreTitleCell * m_titleCells[k_numberOfTitleCells];
+  Shared::StoreTitleCell m_titleCells[k_numberOfTitleCells];
   RegressionContext m_regressionContext;
   StoreParameterController m_storeParameterController;
 };

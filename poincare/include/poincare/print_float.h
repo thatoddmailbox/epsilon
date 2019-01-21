@@ -1,24 +1,17 @@
 #ifndef POINCARE_PRINT_FLOAT_H
 #define POINCARE_PRINT_FLOAT_H
 
-#include <poincare/integer.h>
 #include <assert.h>
+#include <poincare/preferences.h>
 
 namespace Poincare {
 
+class Integer;
+
 namespace PrintFloat {
-  /* The 'Mode' refers to the way to display float 'scientific' or 'auto'. The
-   * scientific mode returns float with style -1.2E2 whereas the auto mode
-   * tries to return 'natural' float like (0.021) and switches to scientific
-   * mode if the float is too small or too big regarding the number of
-   * significant digits. */
-  enum class Mode {
-    Decimal = 0,
-    Scientific = 1,
-  };
   constexpr static int bufferSizeForFloatsWithPrecision(int numberOfSignificantDigits) {
-    // The wors case is -1.234E-38
-    return numberOfSignificantDigits + 7;
+    // The wors case is -1.234E-328
+    return numberOfSignificantDigits + 8;
   }
   /* This function prints the integer i in the buffer with a '.' at the position
    * specified by the decimalMarkerPosition. It starts printing at the end of the
@@ -52,9 +45,9 @@ namespace PrintFloat {
    * ConvertFloatToText return the number of characters that have been written
    * in buffer (excluding the last \O character) */
   template <class T>
-  int convertFloatToText(T d, char * buffer, int bufferSize, int numberOfSignificantDigits, Mode mode);
+  int convertFloatToText(T d, char * buffer, int bufferSize, int numberOfSignificantDigits, Preferences::PrintFloatMode mode);
   template <class T>
-  static int convertFloatToTextPrivate(T f, char * buffer, int numberOfSignificantDigits, Mode mode);
+  static int convertFloatToTextPrivate(T f, char * buffer, int numberOfSignificantDigits, Preferences::PrintFloatMode mode);
 }
 
 }

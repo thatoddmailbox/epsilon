@@ -1,85 +1,84 @@
-extern "C" {
+#include <poincare/division.h>
+#include <poincare/fraction_layout.h>
+#include <poincare/multiplication.h>
+#include <poincare/opposite.h>
+#include <poincare/power.h>
+#include <poincare/rational.h>
+#include <poincare/serialization_helper.h>
+#include <cmath>
 #include <assert.h>
 #include <string.h>
 #include <float.h>
-}
-
-#include <poincare/division.h>
-#include <poincare/power.h>
-#include <poincare/rational.h>
-#include <poincare/tangent.h>
-#include <poincare/multiplication.h>
-#include <poincare/opposite.h>
-#include "layout/fraction_layout.h"
-#include <cmath>
 
 namespace Poincare {
 
-Expression::Type Division::type() const {
-  return Type::Division;
-}
-
-Expression * Division::clone() const {
-  return new Division(m_operands, true);
-}
-
-int Division::polynomialDegree(char symbolName) const {
-  if (operand(1)->polynomialDegree(symbolName) != 0) {
+int DivisionNode::polynomialDegree(Context & context, const char * symbolName) const {
+  if (childAtIndex(1)->polynomialDegree(context, symbolName) != 0) {
     return -1;
   }
-  return operand(0)->polynomialDegree(symbolName);
+  return childAtIndex(0)->polynomialDegree(context, symbolName);
 }
 
-bool Division::needParenthesisWithParent(const Expression * e) const {
-  Type types[] = {Type::Division, Type::Power, Type::Factorial};
-  return e->isOfType(types, 3);
-}
-
-Expression * Division::shallowReduce(Context& context, AngleUnit angleUnit) {
-  Expression * e = Expression::shallowReduce(context, angleUnit);
-  if (e != this) {
-    return e;
+bool DivisionNode::childNeedsParenthesis(const TreeNode * child) const {
+  if (static_cast<const ExpressionNode *>(child)->isNumber() && static_cast<const ExpressionNode *>(child)->sign() == Sign::Negative) {
+    return true;
   }
-  Power * p = new Power(operand(1), new Rational(-1), false);
-  Multiplication * m = new Multiplication(operand(0), p, false);
-  detachOperands();
-  p->shallowReduce(context, angleUnit);
-  replaceWith(m, true);
-  return m->shallowReduce(context, angleUnit);
-}
-
-template<typename T>
-std::complex<T> Division::compute(const std::complex<T> c, const std::complex<T> d) {
-  return c/d;
-}
-
-ExpressionLayout * Division::createLayout(PrintFloat::Mode floatDisplayMode, int numberOfSignificantDigits) const {
-  const Expression * numerator = operand(0)->type() == Type::Parenthesis ? operand(0)->operand(0) : operand(0);
-  const Expression * denominator = operand(1)->type() == Type::Parenthesis ? operand(1)->operand(0) : operand(1);
-  return new FractionLayout(numerator->createLayout(floatDisplayMode, numberOfSignificantDigits), denominator->createLayout(floatDisplayMode, numberOfSignificantDigits), false);
-}
-
-template<typename T> MatrixComplex<T> Division::computeOnComplexAndMatrix(const std::complex<T> c, const MatrixComplex<T> n) {
-  MatrixComplex<T> * inverse = n.createInverse();
-  if (inverse == nullptr) {
-    return MatrixComplex<T>::Undefined();
+  if (static_cast<const ExpressionNode *>(child)->type() == Type::Rational && !static_cast<const RationalNode *>(child)->denominator().isOne()) {
+    return true;
   }
-  MatrixComplex<T> result = Multiplication::computeOnComplexAndMatrix<T>(c, *inverse);
-  delete inverse;
+  Type types[] = {Type::Subtraction, Type::Opposite, Type::Multiplication, Type::Division, Type::Addition};
+  return static_cast<const ExpressionNode *>(child)->isOfType(types, 5);
+}
+
+Layout DivisionNode::createLayout(Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const {
+  const ExpressionNode * numerator = childAtIndex(0)->type() == Type::Parenthesis ? childAtIndex(0)->childAtIndex(0) : childAtIndex(0);
+  const ExpressionNode * denominator = childAtIndex(1)->type() == Type::Parenthesis ? childAtIndex(1)->childAtIndex(0) : childAtIndex(1);
+  return FractionLayout(numerator->createLayout(floatDisplayMode, numberOfSignificantDigits), denominator->createLayout(floatDisplayMode, numberOfSignificantDigits));
+}
+
+int DivisionNode::serialize(char * buffer, int bufferSize, Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const {
+  return SerializationHelper::Infix(this, buffer, bufferSize, floatDisplayMode, numberOfSignificantDigits, "/");
+}
+
+Expression DivisionNode::shallowReduce(Context & context, Preferences::AngleUnit angleUnit, bool replaceSymbols) {
+  return Division(this).shallowReduce(context, angleUnit, replaceSymbols);
+}
+
+template<typename T> Complex<T> DivisionNode::compute(const std::complex<T> c, const std::complex<T> d) {
+  return Complex<T>(c/d);
+}
+
+template<typename T> MatrixComplex<T> DivisionNode::computeOnComplexAndMatrix(const std::complex<T> c, const MatrixComplex<T> n) {
+  MatrixComplex<T> inverse = n.inverse();
+  MatrixComplex<T> result = MultiplicationNode::computeOnComplexAndMatrix<T>(c, inverse);
   return result;
 }
 
-template<typename T> MatrixComplex<T> Division::computeOnMatrices(const MatrixComplex<T> m, const MatrixComplex<T> n) {
+template<typename T> MatrixComplex<T> DivisionNode::computeOnMatrices(const MatrixComplex<T> m, const MatrixComplex<T> n) {
   if (m.numberOfColumns() != n.numberOfColumns()) {
     return MatrixComplex<T>::Undefined();
   }
-  MatrixComplex<T> * inverse = n.createInverse();
-  if (inverse == nullptr) {
-    return MatrixComplex<T>::Undefined();
-  }
-  MatrixComplex<T> result = Multiplication::computeOnMatrices<T>(m, *inverse);
-  delete inverse;
+  MatrixComplex<T> inverse = n.inverse();
+  MatrixComplex<T> result = MultiplicationNode::computeOnMatrices<T>(m, inverse);
   return result;
+}
+
+// Division
+
+Division::Division() : Expression(TreePool::sharedPool()->createTreeNode<DivisionNode>()) {}
+
+Expression Division::shallowReduce(Context & context, Preferences::AngleUnit angleUnit, bool replaceSymbols) {
+  {
+    Expression e = Expression::defaultShallowReduce(context, angleUnit);
+    if (e.isUndefined()) {
+      return e;
+    }
+  }
+  Expression p = Power(childAtIndex(1), Rational(-1));
+  Multiplication m = Multiplication(childAtIndex(0), p);
+  p.shallowReduce(context, angleUnit); // Imagine Division(2,1). p would be 1^(-1) which can be simplified
+  replaceWithInPlace(m);
+  return m.shallowReduce(context, angleUnit);
 }
 
 }

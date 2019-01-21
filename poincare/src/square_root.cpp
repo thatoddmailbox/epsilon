@@ -1,59 +1,58 @@
 #include <poincare/square_root.h>
 #include <poincare/power.h>
-#include <poincare/simplification_engine.h>
-#include "layout/nth_root_layout.h"
-extern "C" {
+#include <poincare/layout_helper.h>
+#include <poincare/serialization_helper.h>
+#include <poincare/simplification_helper.h>
+#include <poincare/nth_root_layout.h>
 #include <assert.h>
-}
 #include <cmath>
 #include <ion.h>
 
 namespace Poincare {
 
-Expression::Type SquareRoot::type() const {
-  return Type::SquareRoot;
+constexpr Expression::FunctionHelper SquareRoot::s_functionHelper;
+
+int SquareRootNode::numberOfChildren() const { return SquareRoot::s_functionHelper.numberOfChildren(); }
+
+Layout SquareRootNode::createLayout(Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const {
+  return NthRootLayout(childAtIndex(0)->createLayout(floatDisplayMode, numberOfSignificantDigits));
 }
 
-Expression * SquareRoot::clone() const {
-  SquareRoot * a = new SquareRoot(m_operands, true);
-  return a;
-}
-
-static_assert('\x91' == Ion::Charset::Root, "Unicode error");
-int SquareRoot::writeTextInBuffer(char * buffer, int bufferSize, PrintFloat::Mode floatDisplayMode, int numberOfSignificantDigits) const {
-  return LayoutEngine::writePrefixExpressionTextInBuffer(this, buffer, bufferSize, floatDisplayMode, numberOfSignificantDigits, "\x91");
+int SquareRootNode::serialize(char * buffer, int bufferSize, Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const {
+  return SerializationHelper::Prefix(this, buffer, bufferSize, floatDisplayMode, numberOfSignificantDigits, SquareRoot::s_functionHelper.name());
 }
 
 template<typename T>
-std::complex<T> SquareRoot::computeOnComplex(const std::complex<T> c, AngleUnit angleUnit) {
+Complex<T> SquareRootNode::computeOnComplex(const std::complex<T> c, Preferences::AngleUnit angleUnit) {
   std::complex<T> result = std::sqrt(c);
   /* Openbsd trigonometric functions are numerical implementation and thus are
    * approximative.
-   * The error epsilon is ~1E-7 on float and ~1E-15 on double. In order to
-   * avoid weird results as sqrt(-1) = 6E-16+i, we compute the argument of
-   * the result of sqrt(c) and if arg ~ 0 [Pi], we discard the residual imaginary
-   * part and if arg ~ Pi/2 [Pi], we discard the residual real part. */
-  return ApproximationEngine::truncateRealOrImaginaryPartAccordingToArgument(result);
+   * The error epsilon is ~1E-7 on float and ~1E-15 on double. In order to avoid
+   * weird results as sqrt(-1) = 6E-16+i, we compute the argument of the result
+   * of sqrt(c) and if arg ~ 0 [Pi], we discard the residual imaginary part and
+   * if arg ~ Pi/2 [Pi], we discard the residual real part.*/
+  return Complex<T>(ApproximationHelper::TruncateRealOrImaginaryPartAccordingToArgument(result));
 }
 
-Expression * SquareRoot::shallowReduce(Context& context, AngleUnit angleUnit) {
-  Expression * e = Expression::shallowReduce(context, angleUnit);
-  if (e != this) {
-    return e;
+Expression SquareRootNode::shallowReduce(Context & context, Preferences::AngleUnit angleUnit, bool replaceSymbols) {
+  return SquareRoot(this).shallowReduce(context, angleUnit, replaceSymbols);
+}
+
+Expression SquareRoot::shallowReduce(Context & context, Preferences::AngleUnit angleUnit, bool replaceSymbols) {
+  {
+    Expression e = Expression::defaultShallowReduce(context, angleUnit);
+    if (e.isUndefined()) {
+      return e;
+    }
   }
 #if MATRIX_EXACT_REDUCING
-  if (operand(0)->type() == Type::Matrix) {
-    return SimplificationEngine::map(this, context, angleUnit);
+  if (childAtIndex(0).type() == ExpressionNode::Type::Matrix) {
+    return SimplificationHelper::Map(this, context, angleUnit);
   }
 #endif
-  Power * p = new Power(operand(0), new Rational(1, 2), false);
-  detachOperands();
-  replaceWith(p, true);
-  return p->shallowReduce(context, angleUnit);
-}
-
-ExpressionLayout * SquareRoot::createLayout(PrintFloat::Mode floatDisplayMode, int numberOfSignificantDigits) const {
-  return new NthRootLayout(operand(0)->createLayout(floatDisplayMode, numberOfSignificantDigits), false);
+  Power p = Power(childAtIndex(0), Rational(1, 2));
+  replaceWithInPlace(p);
+  return p.shallowReduce(context, angleUnit);
 }
 
 }

@@ -1,11 +1,10 @@
 #include "app.h"
-#include "../apps_container.h"
 #include <assert.h>
 
 namespace OnBoarding {
 
 App * App::Snapshot::unpack(Container * container) {
-  return new App(container, this);
+  return new (container->currentAppBuffer()) App(container, this);
 }
 
 App::Descriptor * App::Snapshot::descriptor() {
@@ -15,7 +14,7 @@ App::Descriptor * App::Snapshot::descriptor() {
 
 App::App(Container * container, Snapshot * snapshot) :
   ::App(container, snapshot, &m_languageController),
-  m_languageController(&m_modalViewController, &m_logoController, ((AppsContainer *)container)->updatePopUpController()),
+  m_languageController(&m_modalViewController, &m_logoController),
   m_logoController()
 {
 }

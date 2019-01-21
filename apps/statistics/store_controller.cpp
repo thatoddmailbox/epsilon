@@ -12,8 +12,8 @@ using namespace Shared;
 
 namespace Statistics {
 
-StoreController::StoreController(Responder * parentResponder, Store * store, ButtonRowController * header) :
-  Shared::StoreController(parentResponder, store, header),
+StoreController::StoreController(Responder * parentResponder, InputEventHandlerDelegate * inputEventHandlerDelegate, Store * store, ButtonRowController * header) :
+  Shared::StoreController(parentResponder, inputEventHandlerDelegate, store, header),
   m_titleCells{},
   m_store(store),
   m_statisticsContext(m_store),
@@ -33,7 +33,7 @@ void StoreController::setFormulaLabel() {
   static_cast<ContentView *>(view())->formulaInputView()->setBufferText(text);
 }
 
-bool StoreController::fillColumnWithFormula(Expression * formula) {
+bool StoreController::fillColumnWithFormula(Expression formula) {
   return privateFillColumnWithFormula(formula, Symbol::isSeriesSymbol);
 }
 
@@ -59,7 +59,7 @@ void StoreController::willDisplayCellAtLocation(HighlightCell * cell, int i, int
 
 HighlightCell * StoreController::titleCells(int index) {
   assert(index >= 0 && index < k_numberOfTitleCells);
-  return m_titleCells[index];
+  return &m_titleCells[index];
 }
 
 bool StoreController::setDataAtLocation(double floatBody, int columnIndex, int rowIndex) {
@@ -72,21 +72,6 @@ bool StoreController::setDataAtLocation(double floatBody, int columnIndex, int r
     }
   }
   return Shared::StoreController::setDataAtLocation(floatBody, columnIndex, rowIndex);
-}
-
-View * StoreController::loadView() {
-  for (int i = 0; i < k_numberOfTitleCells; i++) {
-    m_titleCells[i] = new Shared::StoreTitleCell();
-  }
-  return Shared::StoreController::loadView();
-}
-
-void StoreController::unloadView(View * view) {
-  for (int i = 0; i < k_numberOfTitleCells; i++) {
-    delete m_titleCells[i];
-    m_titleCells[i] = nullptr;
-  }
-  Shared::StoreController::unloadView(view);
 }
 
 }

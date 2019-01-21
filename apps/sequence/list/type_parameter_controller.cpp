@@ -2,10 +2,9 @@
 #include "list_controller.h"
 #include "../app.h"
 #include <assert.h>
-#include <poincare/layout_engine.h>
-#include "../../../poincare/src/layout/char_layout.h"
-#include "../../../poincare/src/layout/horizontal_layout.h"
-#include "../../../poincare/src/layout/vertical_offset_layout.h"
+#include <poincare/layout_helper.h>
+#include <poincare/char_layout.h>
+#include <poincare/vertical_offset_layout.h>
 
 using namespace Poincare;
 
@@ -17,7 +16,7 @@ TypeParameterController::TypeParameterController(Responder * parentResponder, Se
   m_expliciteCell(I18n::Message::Explicit, cellLayout),
   m_singleRecurrenceCell(I18n::Message::SingleRecurrence, cellLayout),
   m_doubleRecurenceCell(I18n::Message::DoubleRecurrence, cellLayout),
-  m_expressionLayouts{},
+  m_layouts{},
   m_selectableTableView(this),
   m_sequenceStore(sequenceStore),
   m_sequence(nullptr),
@@ -25,15 +24,6 @@ TypeParameterController::TypeParameterController(Responder * parentResponder, Se
 {
   m_selectableTableView.setMargins(topMargin, rightMargin, bottomMargin, leftMargin);
   m_selectableTableView.setShowsIndicators(false);
-}
-
-TypeParameterController::~TypeParameterController() {
-  for (int i = 0; i < k_totalNumberOfCell; i++) {
-    if (m_expressionLayouts[i]) {
-      delete m_expressionLayouts[i];
-      m_expressionLayouts[i] = nullptr;
-    }
-  }
 }
 
 const char * TypeParameterController::title() {
@@ -119,22 +109,18 @@ KDCoordinate TypeParameterController::cellHeight() {
 
 void TypeParameterController::willDisplayCellAtLocation(HighlightCell * cell, int i, int j) {
   const char * nextName = m_sequenceStore->firstAvailableName();
-  KDText::FontSize size = KDText::FontSize::Large;
+  const KDFont * font = KDFont::LargeFont;
   if (m_sequence) {
     nextName = m_sequence->name();
-    size = KDText::FontSize::Small;
+    font = KDFont::SmallFont;
   }
   const char * subscripts[3] = {"n", "n+1", "n+2"};
-  if (m_expressionLayouts[j]) {
-    delete m_expressionLayouts[j];
-    m_expressionLayouts[j] = nullptr;
-  }
-  m_expressionLayouts[j] = new HorizontalLayout(
-        new CharLayout(nextName[0], size),
-        new VerticalOffsetLayout(LayoutEngine::createStringLayout(subscripts[j], strlen(subscripts[j]), size), VerticalOffsetLayout::Type::Subscript, false),
-        false);
+  m_layouts[j] = HorizontalLayout(
+        CharLayout(nextName[0], font),
+        VerticalOffsetLayout(LayoutHelper::String(subscripts[j], strlen(subscripts[j]), font), VerticalOffsetLayoutNode::Type::Subscript)
+      );
   ExpressionTableCellWithPointer * myCell = (ExpressionTableCellWithPointer *)cell;
-  myCell->setExpressionLayout(m_expressionLayouts[j]);
+  myCell->setLayout(m_layouts[j]);
 }
 
 void TypeParameterController::setSequence(Sequence * sequence) {

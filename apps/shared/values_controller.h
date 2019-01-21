@@ -13,9 +13,9 @@
 
 namespace Shared {
 
-class ValuesController : public EditableCellTableViewController, public ButtonRowDelegate,  public AlternateEmptyViewDelegate {
+class ValuesController : public EditableCellTableViewController, public ButtonRowDelegate,  public AlternateEmptyViewDefaultDelegate {
 public:
-  ValuesController(Responder * parentResponder, ButtonRowController * header, I18n::Message parameterTitle, IntervalParameterController * intervalParameterController, Interval * interval);
+  ValuesController(Responder * parentResponder, InputEventHandlerDelegate * inputEventHandlerDelegate, ButtonRowController * header, I18n::Message parameterTitle, IntervalParameterController * intervalParameterController, Interval * interval);
   const char * title() override;
   Interval * interval();
   int numberOfColumns() override;
@@ -45,8 +45,6 @@ public:
 protected:
   StackViewController * stackController() const;
   bool setDataAtLocation(double floatBody, int columnIndex, int rowIndex) override;
-  View * loadView() override;
-  void unloadView(View * view) override;
   virtual void updateNumberOfColumns();
   Interval * m_interval;
   int m_numberOfColumns;
@@ -54,6 +52,7 @@ protected:
 private:
   virtual Function * functionAtColumn(int i);
   Responder * tabController() const override;
+  SelectableTableView * selectableTableView() override { return &m_selectableTableView; }
   void configureAbscissa();
   void configureFunction();
   bool cellAtLocationIsEditable(int columnIndex, int rowIndex) override;
@@ -64,11 +63,12 @@ private:
   constexpr static int k_maxNumberOfAbscissaCells = 10;
   virtual int maxNumberOfCells() = 0;
   virtual int maxNumberOfFunctions() = 0;
-  EvenOddMessageTextCell * m_abscissaTitleCell;
+  SelectableTableView m_selectableTableView;
+  EvenOddMessageTextCell m_abscissaTitleCell;
   virtual FunctionTitleCell * functionTitleCells(int j) = 0;
   virtual EvenOddBufferTextCell * floatCells(int j) = 0;
   char m_draftTextBuffer[TextField::maxBufferSize()];
-  EvenOddEditableTextCell * m_abscissaCells[k_maxNumberOfAbscissaCells];
+  EvenOddEditableTextCell m_abscissaCells[k_maxNumberOfAbscissaCells];
   virtual FunctionStore * functionStore() const = 0;
   virtual ValuesFunctionParameterController * functionParameterController() = 0;
   ValuesParameterController m_abscissaParameterController;

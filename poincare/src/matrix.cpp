@@ -1,57 +1,37 @@
-extern "C" {
-#include <assert.h>
-#include <stdlib.h>
-}
-#include <poincare/global_context.h>
 #include <poincare/matrix.h>
-#include <poincare/addition.h>
-#include <poincare/decimal.h>
-#include <poincare/undefined.h>
+#include <poincare/rational.h>
 #include <poincare/division.h>
 #include <poincare/subtraction.h>
-#include <poincare/multiplication.h>
-#include "layout/matrix_layout.h"
+#include <poincare/matrix_complex.h>
+#include <poincare/matrix_layout.h>
 #include <cmath>
 #include <float.h>
 #include <string.h>
+#include <assert.h>
+#include <stdlib.h>
 
 namespace Poincare {
 
-Matrix::Matrix(MatrixData * matrixData) :
-  DynamicHierarchy()
-{
-  assert(matrixData != nullptr);
-  m_numberOfOperands = matrixData->numberOfRows()*matrixData->numberOfColumns();
-  m_numberOfRows = matrixData->numberOfRows();
-  matrixData->pilferOperands(&m_operands);
-  for (int i = 0; i < m_numberOfOperands; i++) {
-    const_cast<Expression *>(m_operands[i])->setParent(this);
+void MatrixNode::didAddChildAtIndex(int newNumberOfChildren) {
+  setNumberOfRows(1);
+  setNumberOfColumns(newNumberOfChildren);
+}
+
+int MatrixNode::polynomialDegree(Context & context, const char * symbolName) const {
+  return -1;
+}
+
+Layout MatrixNode::createLayout(Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const {
+  assert(numberOfChildren() > 0);
+  MatrixLayout layout;
+  for (ExpressionNode * c : children()) {
+    layout.addChildAtIndex(c->createLayout(floatDisplayMode, numberOfSignificantDigits), layout.numberOfChildren(), layout.numberOfChildren(), nullptr);
   }
+  layout.setDimensions(m_numberOfRows, m_numberOfColumns);
+  return layout;
 }
 
-Matrix::Matrix(const Expression * const * operands, int numberOfRows, int numberOfColumns, bool cloneOperands) :
-  DynamicHierarchy(operands, numberOfRows*numberOfColumns, cloneOperands),
-  m_numberOfRows(numberOfRows)
-{
-}
-
-int Matrix::numberOfRows() const {
-  return m_numberOfRows;
-}
-
-int Matrix::numberOfColumns() const {
-  return numberOfOperands()/m_numberOfRows;
-}
-
-Expression::Type Matrix::type() const {
-  return Type::Matrix;
-}
-
-Expression * Matrix::clone() const {
-  return new Matrix(m_operands, numberOfRows(), numberOfColumns(), true);
-}
-
-int Matrix::writeTextInBuffer(char * buffer, int bufferSize, PrintFloat::Mode floatDisplayMode, int numberOfSignificantDigits) const {
+int MatrixNode::serialize(char * buffer, int bufferSize, Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const {
   if (bufferSize == 0) {
     return -1;
   }
@@ -64,21 +44,21 @@ int Matrix::writeTextInBuffer(char * buffer, int bufferSize, PrintFloat::Mode fl
   if (currentChar >= bufferSize-1) {
     return currentChar;
   }
-  for (int i = 0; i < numberOfRows(); i++) {
+  for (int i = 0; i < m_numberOfRows; i++) {
     buffer[currentChar++] = '[';
     if (currentChar >= bufferSize-1) {
       return currentChar;
     }
-    currentChar += operand(i*numberOfColumns())->writeTextInBuffer(buffer+currentChar, bufferSize-currentChar, floatDisplayMode, numberOfSignificantDigits);
+    currentChar += childAtIndex(i*m_numberOfColumns)->serialize(buffer+currentChar, bufferSize-currentChar, floatDisplayMode, numberOfSignificantDigits);
     if (currentChar >= bufferSize-1) {
       return currentChar;
     }
-    for (int j = 1; j < numberOfColumns(); j++) {
+    for (int j = 1; j < m_numberOfColumns; j++) {
       buffer[currentChar++] = ',';
       if (currentChar >= bufferSize-1) {
         return currentChar;
       }
-      currentChar += operand(i*numberOfColumns()+j)->writeTextInBuffer(buffer+currentChar, bufferSize-currentChar, floatDisplayMode, numberOfSignificantDigits);
+      currentChar += childAtIndex(i*m_numberOfColumns+j)->serialize(buffer+currentChar, bufferSize-currentChar, floatDisplayMode, numberOfSignificantDigits);
       if (currentChar >= bufferSize-1) {
         return currentChar;
       }
@@ -97,15 +77,92 @@ int Matrix::writeTextInBuffer(char * buffer, int bufferSize, PrintFloat::Mode fl
   return currentChar;
 }
 
-int Matrix::polynomialDegree(char symbolName) const {
-  return -1;
+template<typename T>
+Evaluation<T> MatrixNode::templatedApproximate(Context& context, Preferences::AngleUnit angleUnit) const {
+  MatrixComplex<T> matrix;
+  for (ExpressionNode * c : children()) {
+    matrix.addChildAtIndexInPlace(c->approximate(T(), context, angleUnit), matrix.numberOfChildren(), matrix.numberOfChildren());
+  }
+  matrix.setDimensions(numberOfRows(), numberOfColumns());
+  return matrix;
 }
 
-void Matrix::rowCanonize(Context & context, AngleUnit angleUnit, Multiplication * determinant) {
-  // The matrix has to be reduced to be able to spot 0 inside it
-  for (int i = 0; i < numberOfOperands(); i++) {
-    editableOperand(i)->deepReduce(context, angleUnit);
+// MATRIX
+
+void Matrix::setDimensions(int rows, int columns) {
+  assert(rows * columns == numberOfChildren());
+  setNumberOfRows(rows);
+  setNumberOfColumns(columns);
+}
+
+void Matrix::addChildrenAsRowInPlace(TreeHandle t, int i) {
+  int previousNumberOfColumns = numberOfColumns();
+  if (previousNumberOfColumns > 0) {
+    assert(t.numberOfChildren() == numberOfColumns());
   }
+  int previousNumberOfRows = numberOfRows();
+  for (int i = 0; i < t.numberOfChildren(); i++) {
+    addChildAtIndexInPlace(t.childAtIndex(i), numberOfChildren(), numberOfChildren());
+  }
+  setDimensions(previousNumberOfRows + 1, previousNumberOfColumns == 0 ? t.numberOfChildren() : previousNumberOfColumns);
+}
+
+int Matrix::rank(Context & context, Preferences::AngleUnit angleUnit, bool inPlace) {
+  Matrix m = inPlace ? *this : clone().convert<Matrix>();
+  m = m.rowCanonize(context, angleUnit);
+  int rank = m.numberOfRows();
+  int i = rank-1;
+  while (i >= 0) {
+    int j = m.numberOfColumns()-1;
+    while (j >= i && matrixChild(i,j).isRationalZero()) {
+      j--;
+    }
+    if (j == i-1) {
+      rank--;
+    } else {
+      break;
+    }
+    i--;
+  }
+  return rank;
+}
+
+template<typename T>
+int Matrix::ArrayInverse(T * array, int numberOfRows, int numberOfColumns) {
+  if (numberOfRows != numberOfColumns) {
+    return -1;
+  }
+  assert(numberOfRows*numberOfColumns <= k_maxNumberOfCoefficients);
+  int dim = numberOfRows;
+  /* Create the matrix inv = (A|I) with A the input matrix and I the dim identity matrix */
+  T operands[k_maxNumberOfCoefficients*(3/2)]; // inv dimensions: dim x (2*dim)
+  for (int i = 0; i < dim; i++) {
+    for (int j = 0; j < dim; j++) {
+      operands[i*2*dim+j] = array[i*numberOfColumns+j];
+    }
+    for (int j = dim; j < 2*dim; j++) {
+      operands[i*2*dim+j] = j-dim == i ? 1.0 : 0.0;
+    }
+  }
+  ArrayRowCanonize(operands, dim, 2*dim);
+  // Check inversibility
+  for (int i = 0; i < dim; i++) {
+    if (std::abs(operands[i*2*dim+i] - (T)1.0) > Expression::epsilon<float>()) {
+      return -2;
+    }
+  }
+  for (int i = 0; i < dim; i++) {
+    for (int j = 0; j < dim; j++) {
+      array[i*numberOfColumns+j] = operands[i*2*dim+j+dim];
+    }
+  }
+  return 0;
+}
+
+Matrix Matrix::rowCanonize(Context & context, Preferences::AngleUnit angleUnit, Multiplication determinant) {
+  // The matrix children have to be reduced to be able to spot 0
+  reduceChildren(context, angleUnit, true);
+
   int m = numberOfRows();
   int n = numberOfColumns();
 
@@ -115,52 +172,53 @@ void Matrix::rowCanonize(Context & context, AngleUnit angleUnit, Multiplication 
   while (h < m && k < n) {
     // Find the first non-null pivot
     int iPivot = h;
-    while (iPivot < m && matrixOperand(iPivot, k)->isRationalZero()) {
+    while (iPivot < m && matrixChild(iPivot, k).isRationalZero()) {
       iPivot++;
     }
     if (iPivot == m) {
       // No non-null coefficient in this column, skip
       k++;
       // Update determinant: det *= 0
-      if (determinant) { determinant->addOperand(new Rational(0)); }
+      if (!determinant.isUninitialized()) { determinant.addChildAtIndexInPlace(Rational(0), 0, determinant.numberOfChildren()); }
     } else {
       // Swap row h and iPivot
       if (iPivot != h) {
         for (int col = h; col < n; col++) {
-          swapOperands(iPivot*n+col, h*n+col);
+          swapChildrenInPlace(iPivot*n+col, h*n+col);
         }
         // Update determinant: det *= -1
-        if (determinant) { determinant->addOperand(new Rational(-1)); }
+        if (!determinant.isUninitialized()) { determinant.addChildAtIndexInPlace(Rational(-1), 0, determinant.numberOfChildren()); }
       }
       /* Set to 1 M[h][k] by linear combination */
-      Expression * divisor = matrixOperand(h, k);
+      Expression divisor = matrixChild(h, k);
       // Update determinant: det *= divisor
-      if (determinant) { determinant->addOperand(divisor->clone()); }
+      if (!determinant.isUninitialized()) { determinant.addChildAtIndexInPlace(divisor.clone(), 0, determinant.numberOfChildren()); }
       for (int j = k+1; j < n; j++) {
-        Expression * opHJ = matrixOperand(h, j);
-        Expression * newOpHJ = new Division(opHJ, divisor->clone(), false);
-        replaceOperand(opHJ, newOpHJ, false);
-        newOpHJ->shallowReduce(context, angleUnit);
+        Expression opHJ = matrixChild(h, j);
+        Expression newOpHJ = Division(opHJ, divisor.clone());
+        replaceChildAtIndexInPlace(h*n+j, newOpHJ);
+        newOpHJ = newOpHJ.shallowReduce(context, angleUnit);
       }
-      matrixOperand(h, k)->replaceWith(new Rational(1), true);
+      replaceChildInPlace(divisor, Rational(1));
 
       /* Set to 0 all M[i][j] i != h, j > k by linear combination */
       for (int i = 0; i < m; i++) {
         if (i == h) { continue; }
-        Expression * factor = matrixOperand(i, k);
+        Expression factor = matrixChild(i, k);
         for (int j = k+1; j < n; j++) {
-          Expression * opIJ = matrixOperand(i, j);
-          Expression * newOpIJ = new Subtraction(opIJ, new Multiplication(matrixOperand(h, j), factor, true), false);
-          replaceOperand(opIJ, newOpIJ, false);
-          newOpIJ->editableOperand(1)->shallowReduce(context, angleUnit);
-          newOpIJ->shallowReduce(context, angleUnit);
+          Expression opIJ = matrixChild(i, j);
+          Expression newOpIJ = Subtraction(opIJ, Multiplication(matrixChild(h, j).clone(), factor.clone()));
+          replaceChildAtIndexInPlace(i*n+j, newOpIJ);
+          newOpIJ.childAtIndex(1).shallowReduce(context, angleUnit);
+          newOpIJ = newOpIJ.shallowReduce(context, angleUnit);
         }
-        matrixOperand(i, k)->replaceWith(new Rational(0), true);
+        replaceChildAtIndexInPlace(i*n+k, Rational(0));
       }
       h++;
       k++;
     }
   }
+  return *this;
 }
 
 template<typename T>
@@ -215,159 +273,66 @@ void Matrix::ArrayRowCanonize(T * array, int numberOfRows, int numberOfColumns, 
   }
 }
 
-ExpressionLayout * Matrix::createLayout(PrintFloat::Mode floatDisplayMode, int numberOfSignificantDigits) const {
-  ExpressionLayout ** childrenLayouts = new ExpressionLayout * [numberOfOperands()];
-  for (int i = 0; i < numberOfOperands(); i++) {
-    childrenLayouts[i] = operand(i)->createLayout(floatDisplayMode, numberOfSignificantDigits);
-  }
-  ExpressionLayout * layout = new MatrixLayout(childrenLayouts, numberOfRows(), numberOfColumns(), false);
-  delete [] childrenLayouts;
-  return layout;
-}
-
-int Matrix::rank(Context & context, AngleUnit angleUnit, bool inPlace) {
-  Matrix * m = inPlace ? this : static_cast<Matrix *>(clone());
-  m->rowCanonize(context, angleUnit);
-  int rank = m->numberOfRows();
-  int i = rank-1;
-  while (i >= 0) {
-    int j = m->numberOfColumns()-1;
-    while (j >= i && matrixOperand(i,j)->isRationalZero()) {
-      j--;
-    }
-    if (j == i-1) {
-      rank--;
-    } else {
-      break;
-    }
-    i--;
-  }
-  if (!inPlace) {
-    delete m;
-  }
-  return rank;
-}
-
-template<typename T>
-int Matrix::ArrayInverse(T * array, int numberOfRows, int numberOfColumns) {
-  if (numberOfRows != numberOfColumns) {
-    return -1;
-  }
-  int dim = numberOfRows;
-  /* Create the matrix inv = (A|I) with A the input matrix and I the dim identity matrix */
-  T * operands = new T[dim*2*dim];
-  for (int i = 0; i < dim; i++) {
-    for (int j = 0; j < dim; j++) {
-      operands[i*2*dim+j] = array[i*numberOfColumns+j];
-    }
-    for (int j = dim; j < 2*dim; j++) {
-      operands[i*2*dim+j] = j-dim == i ? 1 : 0;
-    }
-  }
-  ArrayRowCanonize(operands, dim, 2*dim);
-  // Check inversibility
-  for (int i = 0; i < dim; i++) {
-    T one = 1.0;
-    if (std::abs(operands[i*2*dim+i] - one) > Expression::epsilon<float>()) {
-      return -2;
-    }
-  }
-  for (int i = 0; i < dim; i++) {
-    for (int j = 0; j < dim; j++) {
-      array[i*numberOfColumns+j] = operands[i*2*dim+j+dim];
-    }
-  }
-  delete [] operands;
-  return 0;
-}
-
+#if 0
 #if MATRIX_EXACT_REDUCING
-Matrix * Matrix::createTranspose() const {
-  const Expression ** operands = new const Expression * [numberOfOperands()];
-  for (int i = 0; i < numberOfRows(); i++) {
-    for (int j = 0; j < numberOfColumns(); j++) {
-      operands[j*numberOfRows()+i] = operand(i*numberOfColumns()+j);
+Matrix Matrix::transpose() const {
+  Matrix matrix();
+  for (int i = 0; i < m_numberOfRows; i++) {
+    for (int j = 0; j < m_numberOfColumns; j++) {
+      matrix.addChildAtIndexInPlace(childAtIndex(i*m_numberOfRows+j), j*m_numberOfRows+i, j*m_numberOfRows+i);
     }
   }
   // Intentionally swapping dimensions for transpose
-  Matrix * matrix = new Matrix(operands, numberOfColumns(), numberOfRows(), true);
-  delete[] operands;
+  matrix.setDimensions(m_numberOfColumns, m_numberOfRows);
   return matrix;
 }
 
-Matrix * Matrix::createIdentity(int dim) {
-  Expression ** operands = new Expression * [dim*dim];
+Matrix Matrix::createIdentity(int dim) {
+  Matrix matrix();
   for (int i = 0; i < dim; i++) {
     for (int j = 0; j < dim; j++) {
-      if (i == j) {
-        operands[i*dim+j] = new Rational(1);
-      } else {
-        operands[i*dim+j] = new Rational(0);
-      }
+      matrix.addChildAtIndexInPlace(i == j ? Rational(1) : Rational(0), i*dim+j, i*dim+j);
     }
   }
-  Matrix * matrix = new Matrix(operands, dim, dim, false);
-  delete [] operands;
+  matrix.setDimensions(dim, dim);
   return matrix;
 }
 
-Expression * Matrix::createInverse(Context & context, AngleUnit angleUnit) const {
-  if (numberOfRows() != numberOfColumns()) {
-    return new Undefined();
+Expression Matrix::inverse(Context & context, Preferences::AngleUnit angleUnit) const {
+  if (m_numberOfRows != m_numberOfColumns) {
+    return Undefined();
   }
-  int dim = numberOfRows();
+  int dim = m_numberOfRows;
   /* Create the matrix inv = (A|I) with A the input matrix and I the dim identity matrix */
-  const Expression ** operands = new const Expression * [dim*dim*2];
+  Matrix AI;
   for (int i = 0; i < dim; i++) {
     for (int j = 0; j < dim; j++) {
-      operands[i*2*dim+j] = operand(i*dim+j)->clone();
+      AI.addChildAtIndexInPlace(matrixChild(i, j), i*2*dim+j, i*2*dim+j);
     }
     for (int j = dim; j < 2*dim; j++) {
-      operands[i*2*dim+j] = j-dim == i ? new Rational(1) : new Rational(0);
+      AI.addChildAtIndexInPlace(j-dim == i ? Rational(1) : Rational(0), i*2*dim+j, i*2*dim+j);
     }
   }
-  Matrix * AI = new Matrix(operands, dim, 2*dim, false);
-  delete[] operands;
-  AI->rowCanonize(context, angleUnit);
+  AI.setDimensions(dim, 2*dim);
+  AI = AI.rowCanonize(context, angleUnit);
   // Check inversibility
   for (int i = 0; i < dim; i++) {
-    if (AI->matrixOperand(i, i)->type() != Type::Rational || !static_cast<Rational *>(AI->matrixOperand(i, i))->isOne()) {
-      delete AI;
-      return new Undefined;
+    if (AI.matrixChild(i, i)->type() != ExpressionNode::Type::Rational || !static_cast<RationalNode *>(AI.matrixChild(i, i)->node())->isOne()) {
+      return Undefined();
     }
   }
-  const Expression ** invOperands = new const Expression * [dim*dim];
+  Matrix inverse();
   for (int i = 0; i < dim; i++) {
     for (int j = 0; j < dim; j++) {
-      invOperands[i*dim+j] = AI->matrixOperand(i, j+dim);
-      AI->detachOperandAtIndex(i*2*dim+j+dim);
+      addChildAtIndexInPlace(AI.matrixChild(i, j+dim), i*dim+j, i*dim+j);
     }
   }
-  Matrix * inverse = new Matrix(invOperands, dim, dim, false);
-  delete[] invOperands;
-  delete AI;
+  inverse.setDimensions(dim, dim);
   return inverse;
 }
 
 #endif
-
-template<typename T>
-Evaluation<T> * Matrix::templatedApproximate(Context& context, AngleUnit angleUnit) const {
-  std::complex<T> * operands = new std::complex<T> [numberOfOperands()];
-  for (int i = 0; i < numberOfOperands(); i++) {
-    Evaluation<T> * operandEvaluation = operand(i)->privateApproximate(T(), context, angleUnit);
-    if (operandEvaluation->type() != Evaluation<T>::Type::Complex) {
-      operands[i] = Complex<T>::Undefined();
-    } else {
-      std::complex<T> * c = static_cast<Complex<T> *>(operandEvaluation);
-      operands[i] = *c;
-    }
-    delete operandEvaluation;
-  }
-  MatrixComplex<T> * matrix = new MatrixComplex<T>(operands, numberOfRows(), numberOfColumns());
-  delete[] operands;
-  return matrix;
-}
+#endif
 
 template int Matrix::ArrayInverse<float>(float *, int, int);
 template int Matrix::ArrayInverse<double>(double *, int, int);

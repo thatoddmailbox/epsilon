@@ -1,9 +1,9 @@
 #include "interactive_curve_view_range.h"
-#include <poincare.h>
 #include <ion.h>
 #include <cmath>
 #include <stddef.h>
 #include <assert.h>
+#include <poincare/preferences.h>
 
 using namespace Poincare;
 
@@ -159,7 +159,7 @@ void InteractiveCurveViewRange::normalize() {
 void InteractiveCurveViewRange::setTrigonometric() {
   m_xMax = 10.5f;
   MemoizedCurveViewRange::setXMin(-10.5f);
-  if (Preferences::sharedPreferences()->angleUnit() == Expression::AngleUnit::Degree) {
+  if (Preferences::sharedPreferences()->angleUnit() == Preferences::AngleUnit::Degree) {
     m_xMax = 600.0f;
     MemoizedCurveViewRange::setXMin(-600.0f);
   }

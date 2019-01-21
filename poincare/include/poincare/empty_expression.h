@@ -1,30 +1,42 @@
 #ifndef POINCARE_EMPTY_EXPRESSION_H
 #define POINCARE_EMPTY_EXPRESSION_H
 
-#include <poincare/static_hierarchy.h>
-#include <poincare/evaluation.h>
+#include <poincare/expression.h>
 
 namespace Poincare {
 
-/* An empty expression awaits completion by the user. */
+// An empty expression awaits completion by the user.
 
-class EmptyExpression : public StaticHierarchy<0> {
+class EmptyExpressionNode final : public ExpressionNode  {
 public:
-  Type type() const override {
-    return Type::EmptyExpression;
+
+  // TreeNode
+  size_t size() const override { return sizeof(EmptyExpressionNode); }
+  int numberOfChildren() const override { return 0; }
+#if POINCARE_TREE_LOG
+  virtual void logNodeName(std::ostream & stream) const override {
+    stream << "EmptyExpression";
   }
-  Expression * clone() const override;
-  int writeTextInBuffer(char * buffer, int bufferSize, PrintFloat::Mode floatDisplayMode, int numberOfSignificantDigits) const override;
+#endif
+
+  // Properties
+  Type type() const override { return Type::EmptyExpression; }
+  int serialize(char * buffer, int bufferSize, Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const override;
 private:
-  /* Layout */
-  ExpressionLayout * createLayout(PrintFloat::Mode floatDisplayMode, int numberOfSignificantDigits) const override;
-  /* Evaluation */
-  Evaluation<float> * privateApproximate(SinglePrecision p, Context& context, AngleUnit angleUnit) const override { return templatedApproximate<float>(context, angleUnit); }
-  Evaluation<double> * privateApproximate(DoublePrecision p, Context& context, AngleUnit angleUnit) const override { return templatedApproximate<double>(context, angleUnit); }
-  template<typename T> Complex<T> * templatedApproximate(Context& context, AngleUnit angleUnit) const;
+  // Layout
+  Layout createLayout(Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const override;
+  // Evaluation
+  Evaluation<float> approximate(SinglePrecision p, Context& context, Preferences::AngleUnit angleUnit) const override { return templatedApproximate<float>(context, angleUnit); }
+  Evaluation<double> approximate(DoublePrecision p, Context& context, Preferences::AngleUnit angleUnit) const override { return templatedApproximate<double>(context, angleUnit); }
+  template<typename T> Evaluation<T> templatedApproximate(Context& context, Preferences::AngleUnit angleUnit) const;
+};
+
+class EmptyExpression final : public Expression {
+public:
+  EmptyExpression();
+  EmptyExpression(const EmptyExpressionNode * n) : Expression(n) {}
 };
 
 }
 
 #endif
-

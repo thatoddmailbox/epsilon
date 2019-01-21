@@ -34,24 +34,29 @@ public:
     void pack(App * app);
     /* reset all instances to their initial values */
     virtual void reset();
+    virtual void storageDidChangeForRecord(Ion::Storage::Record) {}
     virtual Descriptor * descriptor() = 0;
 #if EPSILON_GETOPT
     virtual void setOpt(const char * name, char * value) {}
 #endif
-  private:
     /* tidy clean all dynamically-allocated data */
     virtual void tidy();
   };
+  /* The destructor has to be virtual. Otherwise calling a destructor on an
+   * App * pointing to a Derived App would have undefined behaviour. */
   virtual ~App() = default;
   constexpr static uint8_t Magic = 0xA8;
   Snapshot * snapshot();
   void setFirstResponder(Responder * responder);
   Responder * firstResponder();
   virtual bool processEvent(Ion::Events::Event event);
+  /* prepareForExit returns true if the app can be switched off in the current
+   * runloop step, else it prepares for a switch off and returns false. */
+  virtual bool prepareForExit() { return true; }
   void displayModalViewController(ViewController * vc, float verticalAlignment, float horizontalAlignment,
     KDCoordinate topMargin = 0, KDCoordinate leftMargin = 0, KDCoordinate bottomMargin = 0, KDCoordinate rightMargin = 0);
   void dismissModalViewController();
-  void displayWarning(I18n::Message warningMessage);
+  void displayWarning(I18n::Message warningMessage1, I18n::Message warningMessage2 = (I18n::Message) 0, bool specialExitKeys = false);
   const Container * container() const;
   uint8_t m_magic; // Poor man's RTTI
 

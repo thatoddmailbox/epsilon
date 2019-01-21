@@ -6,10 +6,13 @@
 
 class EvenOddBufferTextCell : public EvenOddCell {
 public:
-  EvenOddBufferTextCell(KDText::FontSize size = KDText::FontSize::Small, float horizontalAlignment = 1.0f, float verticalAlignment = 0.5f);
+  EvenOddBufferTextCell(const KDFont * font = KDFont::SmallFont, float horizontalAlignment = 1.0f, float verticalAlignment = 0.5f);
   const char * text() const override;
-  void setFontSize(KDText::FontSize fontSize) {
-    m_bufferTextView.setFontSize(fontSize);
+  void setFont(const KDFont * font) {
+    m_bufferTextView.setFont(font);
+  }
+  const KDFont * font() const {
+    return m_bufferTextView.font();
   }
   void setAlignment(float horizontalAlignment, float verticalAlignment) {
     m_bufferTextView.setAlignment(horizontalAlignment, verticalAlignment);
@@ -21,7 +24,8 @@ public:
 protected:
   int numberOfSubviews() const override;
   View * subviewAtIndex(int index) override;
-  void layoutSubviews() override;  BufferTextView m_bufferTextView;
+  void layoutSubviews() override;
+  BufferTextView m_bufferTextView;
 };
 
 #endif

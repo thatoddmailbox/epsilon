@@ -1,28 +1,18 @@
 #include <poincare/subtraction.h>
+#include <poincare/layout_helper.h>
+#include <poincare/serialization_helper.h>
 #include <poincare/addition.h>
-#include <poincare/matrix.h>
 #include <poincare/multiplication.h>
 #include <poincare/opposite.h>
 #include <poincare/rational.h>
-extern "C" {
 #include <assert.h>
-#include <stdlib.h>
-}
 
 namespace Poincare {
 
-Expression::Type Subtraction::type() const {
-  return Expression::Type::Subtraction;
-}
-
-Expression * Subtraction::clone() const {
-  return new Subtraction(m_operands, true);
-}
-
-int Subtraction::polynomialDegree(char symbolName) const {
+int SubtractionNode::polynomialDegree(Context & context, const char * symbolName) const {
   int degree = 0;
-  for (int i = 0; i < numberOfOperands(); i++) {
-    int d = operand(i)->polynomialDegree(symbolName);
+  for (ExpressionNode * e : children()) {
+    int d = e->polynomialDegree(context, symbolName);
     if (d < 0) {
       return -1;
     }
@@ -31,40 +21,53 @@ int Subtraction::polynomialDegree(char symbolName) const {
   return degree;
 }
 
-/* Layout */
+// Private
 
-bool Subtraction::needParenthesisWithParent(const Expression * e) const {
-  Type types[] = {Type::Subtraction, Type::Opposite, Type::Multiplication, Type::Division, Type::Power, Type::Factorial};
-  return e->isOfType(types, 6);
-}
-
-template<typename T>
-std::complex<T> Subtraction::compute(const std::complex<T> c, const std::complex<T> d) {
-  return c - d;
-}
-
-template<typename T> MatrixComplex<T> Subtraction::computeOnComplexAndMatrix(const std::complex<T> c, const MatrixComplex<T> m) {
-  MatrixComplex<T> opposite = computeOnMatrixAndComplex(m, c);
-  std::complex<T> * operands = new std::complex<T> [opposite.numberOfComplexOperands()];
-  for (int i = 0; i < opposite.numberOfComplexOperands(); i++) {
-    operands[i] = -opposite.complexOperand(i);
+bool SubtractionNode::childNeedsParenthesis(const TreeNode * child) const {
+  if (child == childAtIndex(0)) {
+    return false;
   }
-  MatrixComplex<T> result = MatrixComplex<T>(operands, opposite.numberOfRows(), opposite.numberOfColumns());
-  delete[] operands;
+  if (static_cast<const ExpressionNode *>(child)->isNumber() && static_cast<const ExpressionNode *>(child)->sign() == Sign::Negative) {
+    return true;
+  }
+  Type types[] = {Type::Subtraction, Type::Opposite, Type::Addition};
+  return static_cast<const ExpressionNode *>(child)->isOfType(types, 3);
+}
+
+Layout SubtractionNode::createLayout(Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const {
+  return LayoutHelper::Infix(Subtraction(this), floatDisplayMode, numberOfSignificantDigits, "-");
+}
+
+int SubtractionNode::serialize(char * buffer, int bufferSize, Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const {
+    return SerializationHelper::Infix(this, buffer, bufferSize, floatDisplayMode, numberOfSignificantDigits, "-");
+}
+
+template<typename T> MatrixComplex<T> SubtractionNode::computeOnComplexAndMatrix(const std::complex<T> c, const MatrixComplex<T> m) {
+  MatrixComplex<T> opposite = computeOnMatrixAndComplex(m, c);
+  MatrixComplex<T> result;
+  for (int i = 0; i < opposite.numberOfChildren(); i++) {
+    result.addChildAtIndexInPlace(OppositeNode::compute(opposite.complexAtIndex(i)), i, i);
+  }
+  result.setDimensions(opposite.numberOfRows(), opposite.numberOfColumns());
   return result;
 }
 
-Expression * Subtraction::shallowReduce(Context& context, AngleUnit angleUnit) {
-  Expression * e = Expression::shallowReduce(context, angleUnit);
-  if (e != this) {
+Expression SubtractionNode::shallowReduce(Context & context, Preferences::AngleUnit angleUnit, bool replaceSymbols) {
+  return Subtraction(this).shallowReduce(context, angleUnit, replaceSymbols);
+}
+
+Subtraction::Subtraction() : Expression(TreePool::sharedPool()->createTreeNode<SubtractionNode>()) {}
+
+Expression Subtraction::shallowReduce(Context & context, Preferences::AngleUnit angleUnit, bool replaceSymbols) {
+  Expression e = Expression::defaultShallowReduce(context, angleUnit);
+  if (e.isUndefined()) {
     return e;
   }
-  Multiplication * m = new Multiplication(new Rational(-1), operand(1), false);
-  Addition * a = new Addition(operand(0), m, false);
-  detachOperands();
-  m->shallowReduce(context, angleUnit);
-  replaceWith(a, true);
-  return a->shallowReduce(context, angleUnit);
+  Expression m = Multiplication(Rational(-1), childAtIndex(1));
+  Addition a(childAtIndex(0), m);
+  m = m.shallowReduce(context, angleUnit);
+  replaceWithInPlace(a);
+  return a.shallowReduce(context, angleUnit);
 }
 
 }

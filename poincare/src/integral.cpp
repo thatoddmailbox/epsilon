@@ -1,88 +1,78 @@
 #include <poincare/integral.h>
+#include <poincare/complex.h>
+#include <poincare/integral_layout.h>
+#include <poincare/parametered_expression_helper.h>
+#include <poincare/serialization_helper.h>
 #include <poincare/symbol.h>
-#include <poincare/context.h>
 #include <poincare/undefined.h>
 #include <cmath>
-extern "C" {
-#include <assert.h>
 #include <float.h>
 #include <stdlib.h>
-}
-#include "layout/integral_layout.h"
-#include "layout/horizontal_layout.h"
 
 namespace Poincare {
 
-Expression::Type Integral::type() const {
-  return Type::Integral;
-}
+constexpr Expression::FunctionHelper Integral::s_functionHelper;
 
-Expression * Integral::clone() const {
-  Integral * a = new Integral(m_operands, true);
-  return a;
-}
+int IntegralNode::numberOfChildren() const { return Integral::s_functionHelper.numberOfChildren(); }
 
-int Integral::polynomialDegree(char symbolName) const {
-  if (symbolName == 'x') {
-    int da = operand(1)->polynomialDegree(symbolName);
-    int db = operand(2)->polynomialDegree(symbolName);
-    if (da != 0 || db != 0) {
-      return -1;
-    }
+int IntegralNode::polynomialDegree(Context & context, const char * symbolName) const {
+  if (childAtIndex(0)->polynomialDegree(context, symbolName) == 0
+      && childAtIndex(1)->polynomialDegree(context, symbolName) == 0
+      && childAtIndex(2)->polynomialDegree(context, symbolName) == 0
+      && childAtIndex(3)->polynomialDegree(context, symbolName) == 0)
+  {
+    // If no child depends on the symbol, the polynomial degree is 0.
     return 0;
   }
-  return Expression::polynomialDegree(symbolName);
+  return ExpressionNode::polynomialDegree(context, symbolName);
 }
 
-Expression * Integral::shallowReduce(Context& context, AngleUnit angleUnit) {
-  Expression * e = Expression::shallowReduce(context, angleUnit);
-  if (e != this) {
-    return e;
-  }
-#if MATRIX_EXACT_REDUCING
-  if (operand(0)->type() == Type::Matrix || operand(1)->type() == Type::Matrix || operand(2)->type() == Type::Matrix) {
-    return replaceWith(new Undefined(), true);
-  }
-#endif
-  return this;
+Expression IntegralNode::replaceUnknown(const Symbol & symbol) {
+  return ParameteredExpressionHelper::ReplaceUnknownInExpression(Integral(this), symbol);
+}
+
+Layout IntegralNode::createLayout(Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const {
+  return IntegralLayout(
+      childAtIndex(0)->createLayout(floatDisplayMode, numberOfSignificantDigits),
+      childAtIndex(1)->createLayout(floatDisplayMode, numberOfSignificantDigits),
+      childAtIndex(2)->createLayout(floatDisplayMode, numberOfSignificantDigits),
+      childAtIndex(3)->createLayout(floatDisplayMode, numberOfSignificantDigits));
+}
+
+int IntegralNode::serialize(char * buffer, int bufferSize, Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const {
+  return SerializationHelper::Prefix(this, buffer, bufferSize, floatDisplayMode, numberOfSignificantDigits, Integral::s_functionHelper.name());
+}
+
+Expression IntegralNode::shallowReduce(Context & context, Preferences::AngleUnit angleUnit, bool replaceSymbols) {
+  return Integral(this).shallowReduce(context, angleUnit, replaceSymbols);
 }
 
 template<typename T>
-Complex<T> * Integral::templatedApproximate(Context & context, AngleUnit angleUnit) const {
-  Evaluation<T> * aInput = operand(1)->privateApproximate(T(), context, angleUnit);
-  T a = aInput->toScalar();
-  delete aInput;
-  Evaluation<T> * bInput = operand(2)->privateApproximate(T(), context, angleUnit);
-  T b = bInput->toScalar();
-  delete bInput;
+Evaluation<T> IntegralNode::templatedApproximate(Context & context, Preferences::AngleUnit angleUnit) const {
+  Evaluation<T> aInput = childAtIndex(2)->approximate(T(), context, angleUnit);
+  Evaluation<T> bInput = childAtIndex(3)->approximate(T(), context, angleUnit);
+  T a = aInput.toScalar();
+  T b = bInput.toScalar();
   if (std::isnan(a) || std::isnan(b)) {
-    return new Complex<T>(Complex<T>::Undefined());
+    return Complex<T>::Undefined();
   }
 #ifdef LAGRANGE_METHOD
   T result = lagrangeGaussQuadrature<T>(a, b, context, angleUnit);
 #else
   T result = adaptiveQuadrature<T>(a, b, 0.1, k_maxNumberOfIterations, context, angleUnit);
 #endif
-  return new Complex<T>(result);
-}
-
-ExpressionLayout * Integral::createLayout(PrintFloat::Mode floatDisplayMode, int numberOfSignificantDigits) const {
-  return new IntegralLayout(
-      operand(0)->createLayout(floatDisplayMode, numberOfSignificantDigits),
-      operand(1)->createLayout(floatDisplayMode, numberOfSignificantDigits),
-      operand(2)->createLayout(floatDisplayMode, numberOfSignificantDigits),
-      false);
+  return Complex<T>(result);
 }
 
 template<typename T>
-T Integral::functionValueAtAbscissa(T x, Context & context, AngleUnit angleUnit) const {
-  return operand(0)->approximateWithValueForSymbol('x', x, context, angleUnit);
+T IntegralNode::functionValueAtAbscissa(T x, Context & context, Preferences::AngleUnit angleUnit) const {
+  return Expression(childAtIndex(0)).approximateWithValueForSymbol(static_cast<SymbolNode *>(childAtIndex(1))->name(), x, context, angleUnit);
 }
 
 #ifdef LAGRANGE_METHOD
 
 template<typename T>
-T Integral::lagrangeGaussQuadrature(T a, T b, Context & context, AngleUnit angleUnit) const {
+T IntegralNode::lagrangeGaussQuadrature(T a, T b, Context & context, Preferences::AngleUnit angleUnit) const {
   /* We here use Gauss-Legendre quadrature with n = 5
    * Gauss-Legendre abscissae and weights can be found in
    * C/C++ library source code. */
@@ -113,7 +103,7 @@ T Integral::lagrangeGaussQuadrature(T a, T b, Context & context, AngleUnit angle
 #else
 
 template<typename T>
-Integral::DetailedResult<T> Integral::kronrodGaussQuadrature(T a, T b, Context & context, AngleUnit angleUnit) const {
+IntegralNode::DetailedResult<T> IntegralNode::kronrodGaussQuadrature(T a, T b, Context & context, Preferences::AngleUnit angleUnit) const {
   static T epsilon = sizeof(T) == sizeof(double) ? DBL_EPSILON : FLT_EPSILON;
   static T max = sizeof(T) == sizeof(double) ? DBL_MAX : FLT_MAX;
   /* We here use Kronrod-Legendre quadrature with n = 21
@@ -188,8 +178,8 @@ Integral::DetailedResult<T> Integral::kronrodGaussQuadrature(T a, T b, Context &
 }
 
 template<typename T>
-T Integral::adaptiveQuadrature(T a, T b, T eps, int numberOfIterations, Context & context, AngleUnit angleUnit) const {
-  if (shouldStopProcessing()) {
+T IntegralNode::adaptiveQuadrature(T a, T b, T eps, int numberOfIterations, Context & context, Preferences::AngleUnit angleUnit) const {
+  if (Integral::shouldStopProcessing()) {
     return NAN;
   }
   DetailedResult<T> quadKG = kronrodGaussQuadrature(a, b, context, angleUnit);
@@ -204,5 +194,24 @@ T Integral::adaptiveQuadrature(T a, T b, T eps, int numberOfIterations, Context 
   }
 }
 #endif
+
+Expression Integral::shallowReduce(Context & context, Preferences::AngleUnit angleUnit, bool replaceSymbols) {
+  {
+    Expression e = Expression::defaultShallowReduce(context, angleUnit);
+    if (e.isUndefined()) {
+      return e;
+    }
+  }
+#if MATRIX_EXACT_REDUCING
+  if (childAtIndex(0).type() == ExpressionNode::Type::Matrix
+      || childAtIndex(1).type() == ExpressionNode::Type::Matrix
+      || childAtIndex(2).type() == ExpressionNode::Type::Matrix
+      || childAtIndex(3).type() == ExpressionNode::Type::Matrix)
+  {
+    return Undefined();
+  }
+#endif
+  return *this;
+}
 
 }

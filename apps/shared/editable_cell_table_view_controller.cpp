@@ -11,7 +11,7 @@ using namespace Poincare;
 namespace Shared {
 
 EditableCellTableViewController::EditableCellTableViewController(Responder * parentResponder) :
-  TabTableController(parentResponder, this)
+  TabTableController(parentResponder)
 {
 }
 
@@ -63,7 +63,7 @@ KDCoordinate EditableCellTableViewController::rowHeight(int j) {
   return k_cellHeight;
 }
 
-void EditableCellTableViewController::willDisplayCellAtLocationWithDisplayMode(HighlightCell * cell, int i, int j, PrintFloat::Mode floatDisplayMode) {
+void EditableCellTableViewController::willDisplayCellAtLocationWithDisplayMode(HighlightCell * cell, int i, int j, Preferences::PrintFloatMode floatDisplayMode) {
   EvenOddCell * myCell = (EvenOddCell *)cell;
   /* We set the cell even or odd state only if the cell is not being edited.
    * Otherwise, the cell background is white whichever it is an odd or even cell

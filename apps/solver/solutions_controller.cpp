@@ -4,6 +4,11 @@
 #include "../shared/poincare_helpers.h"
 #include <assert.h>
 #include <limits.h>
+#include <poincare/layout_helper.h>
+#include <poincare/char_layout.h>
+#include <poincare/horizontal_layout.h>
+#include <poincare/symbol_abstract.h>
+#include <poincare/vertical_offset_layout.h>
 
 using namespace Poincare;
 using namespace Shared;
@@ -11,8 +16,8 @@ using namespace Shared;
 namespace Solver {
 
 SolutionsController::ContentView::ContentView(SolutionsController * controller) :
-  m_warningMessageView0(KDText::FontSize::Small, I18n::Message::OnlyFirstSolutionsDisplayed0, 0.5f, 0.5f, KDColorBlack, Palette::WallScreenDark),
-  m_warningMessageView1(KDText::FontSize::Small, I18n::Message::OnlyFirstSolutionsDisplayed1, 0.5f, 0.5f, KDColorBlack, Palette::WallScreenDark),
+  m_warningMessageView0(KDFont::SmallFont, I18n::Message::OnlyFirstSolutionsDisplayed0, 0.5f, 0.5f, KDColorBlack, Palette::WallScreenDark),
+  m_warningMessageView1(KDFont::SmallFont, I18n::Message::OnlyFirstSolutionsDisplayed1, 0.5f, 0.5f, KDColorBlack, Palette::WallScreenDark),
   m_selectableTableView(controller),
   m_displayWarningMoreSolutions(false)
 {
@@ -50,7 +55,7 @@ View * SolutionsController::ContentView::subviewAtIndex(int index) {
 
 void SolutionsController::ContentView::layoutSubviews() {
   if (m_displayWarningMoreSolutions) {
-    KDCoordinate textHeight = KDText::charSize(KDText::FontSize::Small).height();
+    KDCoordinate textHeight = KDFont::SmallFont->glyphSize().height();
     m_warningMessageView0.setFrame(KDRect(0, k_topMargin/2-textHeight, bounds().width(), textHeight));
     m_warningMessageView1.setFrame(KDRect(0, k_topMargin/2, bounds().width(), textHeight));
     m_selectableTableView.setFrame(KDRect(0, k_topMargin, bounds().width(),  bounds().height()-k_topMargin));
@@ -63,27 +68,20 @@ SolutionsController::SolutionsController(Responder * parentResponder, EquationSt
   ViewController(parentResponder),
   m_equationStore(equationStore),
   m_deltaCell(0.5f, 0.5f),
-  m_delta2Layout(nullptr),
+  m_delta2Layout(),
   m_contentView(this)
 {
-  m_delta2Layout = new HorizontalLayout(new VerticalOffsetLayout(new CharLayout('2', KDText::FontSize::Small), VerticalOffsetLayout::Type::Superscript, false), LayoutEngine::createStringLayout("-4ac", 4, KDText::FontSize::Small), false);
+  m_delta2Layout = HorizontalLayout(VerticalOffsetLayout(CharLayout('2', KDFont::SmallFont), VerticalOffsetLayoutNode::Type::Superscript), LayoutHelper::String("-4ac", 4, KDFont::SmallFont));
   char deltaB[] = {Ion::Charset::CapitalDelta, '=', 'b'};
-  static_cast<HorizontalLayout *>(m_delta2Layout)->addOrMergeChildAtIndex(LayoutEngine::createStringLayout(deltaB, 3, KDText::FontSize::Small), 0, false);
+  static_cast<HorizontalLayout&>(m_delta2Layout).addOrMergeChildAtIndex(LayoutHelper::String(deltaB, 3, KDFont::SmallFont), 0, false);
   for (int i = 0; i < EquationStore::k_maxNumberOfExactSolutions; i++) {
     m_exactValueCells[i].setParentResponder(m_contentView.selectableTableView());
   }
   for (int i = 0; i < EquationStore::k_maxNumberOfApproximateSolutions; i++) {
-    m_approximateValueCells[i].setFontSize(KDText::FontSize::Large);
+    m_approximateValueCells[i].setFont(KDFont::LargeFont);
   }
   for (int i = 0; i < EquationStore::k_maxNumberOfSolutions; i++) {
     m_symbolCells[i].setAlignment(0.5f, 0.5f);
-  }
-}
-
-SolutionsController::~SolutionsController() {
-  if (m_delta2Layout) {
-    delete m_delta2Layout;
-    m_delta2Layout = nullptr;
   }
 }
 
@@ -150,27 +148,33 @@ int SolutionsController::numberOfColumns() {
 
 void SolutionsController::willDisplayCellAtLocation(HighlightCell * cell, int i, int j) {
   if (i == 0) {
+    // Name of the variable or discriminant
     if (m_equationStore->type() == EquationStore::Type::PolynomialMonovariable && j == m_equationStore->numberOfSolutions()) {
+      // Discriminant
       EvenOddExpressionCell * deltaCell = static_cast<EvenOddExpressionCell *>(cell);
-      deltaCell->setExpressionLayout(m_delta2Layout);
+      deltaCell->setLayout(m_delta2Layout);
     } else {
       EvenOddBufferTextCell * symbolCell = static_cast<EvenOddBufferTextCell *>(cell);
-      symbolCell->setFontSize(KDText::FontSize::Large);
-      char bufferSymbol[10]; // hold at maximum Delta = b^2-4ac
+      symbolCell->setFont(KDFont::LargeFont);
+      char bufferSymbol[Poincare::SymbolAbstract::k_maxNameSize+1]; // Hold at maximum Delta = b^2-4ac or the variable name + a digit
       switch (m_equationStore->type()) {
         case EquationStore::Type::LinearSystem:
-          bufferSymbol[0] = m_equationStore->variableAtIndex(j);
-          bufferSymbol[1] = 0;
+          /* The system has more than one variable: the cell text is the
+           * variable name */
+          strlcpy(bufferSymbol, m_equationStore->variableAtIndex(j), Poincare::SymbolAbstract::k_maxNameSize);
           break;
         default:
-          bufferSymbol[0] = m_equationStore->variableAtIndex(0);
-          bufferSymbol[1] = j+'0';
-          bufferSymbol[2] = 0;
+          /* The system has one variable but might have many solutions: the cell
+           * text is variableX, with X the row index. For instance, x0, x1,...*/
+          int length = strlcpy(bufferSymbol, m_equationStore->variableAtIndex(0), Poincare::SymbolAbstract::k_maxNameSize);
+          bufferSymbol[length++] = j+'0';
+          bufferSymbol[length] = 0;
           break;
       }
       symbolCell->setText(bufferSymbol);
     }
   } else {
+    // Value of the variable or discriminant
     if (m_equationStore->type() == EquationStore::Type::Monovariable) {
       EvenOddBufferTextCell * valueCell = static_cast<EvenOddBufferTextCell *>(cell);
       char bufferValue[PrintFloat::bufferSizeForFloatsWithPrecision(Constant::LargeNumberOfSignificantDigits)];
@@ -178,10 +182,9 @@ void SolutionsController::willDisplayCellAtLocation(HighlightCell * cell, int i,
       valueCell->setText(bufferValue);
     } else {
       Shared::ScrollableExactApproximateExpressionsCell * valueCell = static_cast<ScrollableExactApproximateExpressionsCell *>(cell);
-      Poincare::ExpressionLayout * exactLayout = m_equationStore->exactSolutionLayoutsAtIndexAreIdentical(j) ? nullptr : m_equationStore->exactSolutionLayoutAtIndex(j, true);
-      Poincare::ExpressionLayout * exactSolutionLayouts[2] = {m_equationStore->exactSolutionLayoutAtIndex(j, false), exactLayout};
-      valueCell->setExpressions(exactSolutionLayouts);
-      if (exactLayout) {
+      Poincare::Layout exactLayout = m_equationStore->exactSolutionLayoutsAtIndexAreIdentical(j) ? Poincare::Layout() : m_equationStore->exactSolutionLayoutAtIndex(j, true);
+      valueCell->setLayouts(m_equationStore->exactSolutionLayoutAtIndex(j, false), exactLayout);
+      if (!exactLayout.isUninitialized()) {
         valueCell->setEqualMessage(m_equationStore->exactSolutionLayoutsAtIndexAreEqual(j) ? I18n::Message::Equal : I18n::Message::AlmostEqual);
       }
     }
@@ -202,11 +205,11 @@ KDCoordinate SolutionsController::rowHeight(int j) {
   if (m_equationStore->type() == EquationStore::Type::Monovariable) {
     return k_defaultCellHeight;
   }
-  Poincare::ExpressionLayout * exactLayout = m_equationStore->exactSolutionLayoutAtIndex(j, true);
-  Poincare::ExpressionLayout * approximateLayout = m_equationStore->exactSolutionLayoutAtIndex(j, false);
-  KDCoordinate exactLayoutHeight = exactLayout->size().height();
-  KDCoordinate approximateLayoutHeight = approximateLayout->size().height();
-  KDCoordinate layoutHeight = max(exactLayout->baseline(), approximateLayout->baseline()) + max(exactLayoutHeight-exactLayout->baseline(), approximateLayoutHeight-approximateLayout->baseline());
+  Poincare::Layout exactLayout = m_equationStore->exactSolutionLayoutAtIndex(j, true);
+  Poincare::Layout approximateLayout = m_equationStore->exactSolutionLayoutAtIndex(j, false);
+  KDCoordinate exactLayoutHeight = exactLayout.layoutSize().height();
+  KDCoordinate approximateLayoutHeight = approximateLayout.layoutSize().height();
+  KDCoordinate layoutHeight = max(exactLayout.baseline(), approximateLayout.baseline()) + max(exactLayoutHeight-exactLayout.baseline(), approximateLayoutHeight-approximateLayout.baseline());
   return layoutHeight+ScrollableExactApproximateExpressionsCell::k_margin*2;
 }
 

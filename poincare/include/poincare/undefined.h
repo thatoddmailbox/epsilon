@@ -1,24 +1,50 @@
 #ifndef POINCARE_UNDEFINED_H
 #define POINCARE_UNDEFINED_H
 
-#include <poincare/static_hierarchy.h>
-#include <poincare/evaluation.h>
+#include <poincare/number.h>
 
 namespace Poincare {
 
-class Undefined : public StaticHierarchy<0> {
+class UndefinedNode final : public NumberNode {
 public:
-  Type type() const override;
-  Expression * clone() const override;
-  int writeTextInBuffer(char * buffer, int bufferSize, PrintFloat::Mode floatDisplayMode, int numberOfSignificantDigits) const override;
-  int polynomialDegree(char symbolName) const override;
+
+  // TreeNode
+  size_t size() const override { return sizeof(UndefinedNode); }
+#if POINCARE_TREE_LOG
+  virtual void logNodeName(std::ostream & stream) const override {
+    stream << "Undefined";
+  }
+#endif
+
+  // Properties
+  Type type() const override { return Type::Undefined; }
+  int polynomialDegree(Context & context, const char * symbolName) const override;
+  Expression setSign(Sign s, Context & context, Preferences::AngleUnit angleUnit) override;
+
+  // Approximation
+  Evaluation<float> approximate(SinglePrecision p, Context& context, Preferences::AngleUnit angleUnit) const override {
+    return templatedApproximate<float>();
+  }
+  Evaluation<double> approximate(DoublePrecision p, Context& context, Preferences::AngleUnit angleUnit) const override {
+    return templatedApproximate<double>();
+  }
+
+  // Layout
+  Layout createLayout(Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const override;
+  int serialize(char * buffer, int bufferSize, Preferences::PrintFloatMode floatDisplayMode = Preferences::PrintFloatMode::Decimal, int numberOfSignificantDigits = 0) const override;
 private:
-  /* Layout */
-  ExpressionLayout * createLayout(PrintFloat::Mode floatDisplayMode, int numberOfSignificantDigits) const override;
-  /* Evaluation */
-  Evaluation<float> * privateApproximate(SinglePrecision p, Context& context, AngleUnit angleUnit) const override { return templatedApproximate<float>(context, angleUnit); }
-  Evaluation<double> * privateApproximate(DoublePrecision p, Context& context, AngleUnit angleUnit) const override { return templatedApproximate<double>(context, angleUnit); }
-  template<typename T> Complex<T> * templatedApproximate(Context& context, AngleUnit angleUnit) const;
+  template<typename T> Evaluation<T> templatedApproximate() const;
+};
+
+class Undefined final : public Number {
+public:
+  Undefined() : Number(TreePool::sharedPool()->createTreeNode<UndefinedNode>()) {}
+  static const char * Name() {
+    return "undef";
+  }
+  static int NameSize() {
+    return 6;
+  }
 };
 
 }

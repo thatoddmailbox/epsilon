@@ -7,13 +7,16 @@
 
 using namespace Poincare;
 
+static inline int min(int x, int y) { return (x<y ? x : y); }
+static inline int max(int x, int y) { return (x>y ? x : y); }
+
 namespace Shared {
 
-StoreController::ContentView::ContentView(DoublePairStore * store, Responder * parentResponder, TableViewDataSource * dataSource, SelectableTableViewDataSource * selectionDataSource, TextFieldDelegate * textFieldDelegate) :
+StoreController::ContentView::ContentView(DoublePairStore * store, Responder * parentResponder, TableViewDataSource * dataSource, SelectableTableViewDataSource * selectionDataSource, InputEventHandlerDelegate * inputEventHandlerDelegate, TextFieldDelegate * textFieldDelegate) :
   View(),
   Responder(parentResponder),
   m_dataView(store, this, dataSource, selectionDataSource),
-  m_formulaInputView(this, textFieldDelegate),
+  m_formulaInputView(this, inputEventHandlerDelegate, textFieldDelegate),
   m_displayFormulaInputView(false)
 {
   m_dataView.setBackgroundColor(Palette::WallScreenDark);
@@ -23,6 +26,9 @@ StoreController::ContentView::ContentView(DoublePairStore * store, Responder * p
 
 void StoreController::ContentView::displayFormulaInput(bool display) {
   if (m_displayFormulaInputView != display) {
+    if (display) {
+      m_formulaInputView.textField()->setText("");
+    }
     m_displayFormulaInputView = display;
     layoutSubviews();
     markRectAsDirty(bounds());
@@ -49,39 +55,44 @@ KDRect StoreController::ContentView::formulaFrame() const {
   return KDRect(0, bounds().height() - k_formulaInputHeight, bounds().width(), m_displayFormulaInputView ? k_formulaInputHeight : 0);
 }
 
-StoreController::StoreController(Responder * parentResponder, DoublePairStore * store, ButtonRowController * header) :
+StoreController::StoreController(Responder * parentResponder, InputEventHandlerDelegate * inputEventHandlerDelegate, DoublePairStore * store, ButtonRowController * header) :
   EditableCellTableViewController(parentResponder),
   ButtonRowDelegate(header, nullptr),
   m_editableCells{},
-  m_store(store)
+  m_store(store),
+  m_contentView(m_store, this, this, this, inputEventHandlerDelegate, this)
 {
+  for (int i = 0; i < k_maxNumberOfEditableCells; i++) {
+    m_editableCells[i].setParentResponder(m_contentView.dataView());
+    m_editableCells[i].editableTextCell()->textField()->setDelegates(inputEventHandlerDelegate, this);
+    m_editableCells[i].editableTextCell()->textField()->setDraftTextBuffer(m_draftTextBuffer);
+  }
 }
 
 void StoreController::displayFormulaInput() {
   setFormulaLabel();
-  contentView()->displayFormulaInput(true);
+  m_contentView.displayFormulaInput(true);
 }
 
 bool StoreController::textFieldShouldFinishEditing(TextField * textField, Ion::Events::Event event) {
-  if (textField == contentView()->formulaInputView()->textField()) {
+  if (textField == m_contentView.formulaInputView()->textField()) {
     return event == Ion::Events::OK || event == Ion::Events::EXE;
   }
   return EditableCellTableViewController::textFieldShouldFinishEditing(textField, event);
 }
 
 bool StoreController::textFieldDidFinishEditing(TextField * textField, const char * text, Ion::Events::Event event) {
-  if (textField == contentView()->formulaInputView()->textField()) {
+  if (textField == m_contentView.formulaInputView()->textField()) {
     // Handle formula input
-    Expression * expression = Expression::parse(textField->text());
-    if (expression == nullptr) {
+    Expression expression = Expression::Parse(textField->text());
+    if (expression.isUninitialized()) {
       app()->displayWarning(I18n::Message::SyntaxError);
       return false;
     }
-    contentView()->displayFormulaInput(false);
+    m_contentView.displayFormulaInput(false);
     if (fillColumnWithFormula(expression)) {
-      app()->setFirstResponder(contentView());
+      app()->setFirstResponder(&m_contentView);
     }
-    delete expression;
     return true;
   }
   AppsContainer * appsContainer = ((TextFieldDelegateApp *)app())->container();
@@ -106,9 +117,9 @@ bool StoreController::textFieldDidFinishEditing(TextField * textField, const cha
 }
 
 bool StoreController::textFieldDidAbortEditing(TextField * textField) {
-  if (textField == contentView()->formulaInputView()->textField()) {
-    contentView()->displayFormulaInput(false);
-    app()->setFirstResponder(contentView());
+  if (textField == m_contentView.formulaInputView()->textField()) {
+    m_contentView.displayFormulaInput(false);
+    app()->setFirstResponder(&m_contentView);
     return true;
   }
   return EditableCellTableViewController::textFieldDidAbortEditing(textField);
@@ -139,7 +150,7 @@ HighlightCell * StoreController::reusableCell(int index, int type) {
       return titleCells(index);
     case k_editableCellType:
       assert(index < k_maxNumberOfEditableCells);
-      return m_editableCells[index];
+      return &m_editableCells[index];
     default:
       assert(false);
       return nullptr;
@@ -175,7 +186,7 @@ void StoreController::willDisplayCellAtLocation(HighlightCell * cell, int i, int
   if (cellAtLocationIsEditable(i, j)) {
     static_cast<StoreCell *>(cell)->setHide(false);
   }
-  willDisplayCellAtLocationWithDisplayMode(cell, i, j, PrintFloat::Mode::Decimal);
+  willDisplayCellAtLocationWithDisplayMode(cell, i, j, Preferences::PrintFloatMode::Decimal);
 }
 
 const char * StoreController::title() {
@@ -183,7 +194,7 @@ const char * StoreController::title() {
 }
 
 bool StoreController::handleEvent(Ion::Events::Event event) {
-  if (event == Ion::Events::Up && !static_cast<ContentView *>(view())->formulaInputView()->textField()->isEditing()) {
+  if (event == Ion::Events::Up) {
     selectableTableView()->deselectTable();
     assert(selectedRow() == -1);
     app()->setFirstResponder(tabController());
@@ -214,7 +225,7 @@ void StoreController::didBecomeFirstResponder() {
     selectCellAtLocation(0, 0);
   }
   EditableCellTableViewController::didBecomeFirstResponder();
-  app()->setFirstResponder(contentView());
+  app()->setFirstResponder(&m_contentView);
 }
 
 Responder * StoreController::tabController() const {
@@ -222,7 +233,7 @@ Responder * StoreController::tabController() const {
 }
 
 SelectableTableView * StoreController::selectableTableView() {
-  return contentView()->dataView();
+  return m_contentView.dataView();
 }
 
 bool StoreController::cellAtLocationIsEditable(int columnIndex, int rowIndex) {
@@ -253,32 +264,20 @@ int StoreController::maxNumberOfElements() const {
   return DoublePairStore::k_maxNumberOfPairs;
 }
 
-View * StoreController::loadView() {
-  ContentView * contentView = new ContentView(m_store, this, this, this, this);
-  for (int i = 0; i < k_maxNumberOfEditableCells; i++) {
-    m_editableCells[i] = new StoreCell(contentView->dataView(), this, m_draftTextBuffer);
-  }
-  return contentView;
-}
-
-void StoreController::unloadView(View * view) {
-  for (int i = 0; i < k_maxNumberOfEditableCells; i++) {
-    delete m_editableCells[i];
-    m_editableCells[i] = nullptr;
-  }
-  delete view;
-}
-
-bool StoreController::privateFillColumnWithFormula(Expression * formula, Expression::isVariableTest isVariable) {
+bool StoreController::privateFillColumnWithFormula(Expression formula, ExpressionNode::isVariableTest isVariable) {
   int currentColumn = selectedColumn();
   // Fetch the series used in the formula to compute the size of the filled in series
-  char variables[Expression::k_maxNumberOfVariables];
-  variables[0] = 0;
-  formula->getVariables(isVariable, variables);
+  constexpr static int k_maxSizeOfStoreSymbols = 3; // "V1", "N1", "X1", "Y1"
+  char variables[Expression::k_maxNumberOfVariables][k_maxSizeOfStoreSymbols];
+  variables[0][0] = 0;
+  AppsContainer * appsContainer = ((TextFieldDelegateApp *)app())->container();
+  int nbOfVariables = formula.getVariables(*(appsContainer->globalContext()), isVariable, (char *)variables, k_maxSizeOfStoreSymbols);
+  (void) nbOfVariables; // Remove compilation warning of nused variable
+  assert(nbOfVariables >= 0);
   int numberOfValuesToCompute = -1;
   int index = 0;
-  while (variables[index] != 0) {
-    const char * seriesName = Symbol::textForSpecialSymbols(variables[index]);
+  while (variables[index][0] != 0) {
+    const char * seriesName = variables[index];
     assert(strlen(seriesName) == 2);
     int series = (int)(seriesName[1] - '0') - 1;
     assert(series >= 0 && series < DoublePairStore::k_numberOfSeries);

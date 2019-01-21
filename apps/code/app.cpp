@@ -27,11 +27,7 @@ App::Snapshot::Snapshot() :
 }
 
 App * App::Snapshot::unpack(Container * container) {
-  return new App(container, this);
-}
-
-void App::Snapshot::reset() {
-  m_scriptStore.deleteAllScripts();
+  return new (container->currentAppBuffer()) App(container, this);
 }
 
 App::Descriptor * App::Snapshot::descriptor() {
@@ -57,9 +53,15 @@ void App::Snapshot::setOpt(const char * name, char * value) {
       }
       *separator = 0;
       const char * scriptName = value;
-      const char * scriptContent = separator+1;
+      /* We include the 0 in the scriptContent to represent the importation
+       * status. It is set to 1 after addScriptFromTemplate. Indeed, this '/0'
+       * char has two goals: ending the scriptName and representing the
+       * importation status; we cannot set it to 1 before adding the script to
+       * storage. */
+      const char * scriptContent = separator;
       Code::ScriptTemplate script(scriptName, scriptContent);
       m_scriptStore.addScriptFromTemplate(&script);
+      m_scriptStore.scriptNamed(scriptName).toggleImportationStatus(); // set Importation Status to 1
       return;
   }
   if (strcmp(name, "lock-on-console") == 0) {
@@ -70,25 +72,31 @@ void App::Snapshot::setOpt(const char * name, char * value) {
 #endif
 
 App::App(Container * container, Snapshot * snapshot) :
-  ::App(container, snapshot, &m_codeStackViewController, I18n::Message::Warning),
-  m_consoleController(nullptr, snapshot->scriptStore()
+  Shared::InputEventHandlerDelegateApp(container, snapshot, &m_codeStackViewController),
+  m_pythonHeap{},
+  m_pythonUser(nullptr),
+  m_consoleController(nullptr, this, snapshot->scriptStore()
 #if EPSILON_GETOPT
       , snapshot->lockOnConsole()
 #endif
       ),
   m_listFooter(&m_codeStackViewController, &m_menuController, &m_menuController, ButtonRowController::Position::Bottom, ButtonRowController::Style::EmbossedGrey, ButtonRowController::Size::Large),
-  m_menuController(&m_listFooter, snapshot->scriptStore(), &m_listFooter),
+  m_menuController(&m_listFooter, this, snapshot->scriptStore(), &m_listFooter),
   m_codeStackViewController(&m_modalViewController, &m_listFooter),
-  m_variableBoxController(&m_menuController, snapshot->scriptStore())
+  m_variableBoxController(this, snapshot->scriptStore())
 {
+}
+
+App::~App() {
+  assert(!m_consoleController.inputRunLoopActive());
+  deinitPython();
 }
 
 bool App::handleEvent(Ion::Events::Event event) {
   if (event == Ion::Events::Home && m_consoleController.inputRunLoopActive()) {
-    // We need to return true here because we want to actually exit from the
-    // input run loop, which requires ending a dispatchEvent cycle.
-    m_consoleController.askInputRunLoopTermination();
-    m_consoleController.interrupt();
+    /* We need to return true here because we want to actually exit from the
+     * input run loop, which requires ending a dispatchEvent cycle. */
+    m_consoleController.terminateInputLoop();
     if (m_modalViewController.isDisplayingModal()) {
       m_modalViewController.dismissModalViewController();
     }
@@ -97,18 +105,35 @@ bool App::handleEvent(Ion::Events::Event event) {
   return false;
 }
 
-bool App::textInputDidReceiveEvent(TextInput * textInput, Ion::Events::Event event) {
+Toolbox * App::toolboxForInputEventHandler(InputEventHandler * textInput) {
+  return &m_toolbox;
+}
+
+VariableBoxController * App::variableBoxForInputEventHandler(InputEventHandler * textInput) {
+  return &m_variableBoxController;
+}
+
+bool App::textInputDidReceiveEvent(InputEventHandler * textInput, Ion::Events::Event event) {
   const char * pythonText = Helpers::PythonTextForEvent(event);
   if (pythonText != nullptr) {
     textInput->handleEventWithText(pythonText);
     return true;
   }
-  if (event == Ion::Events::Var) {
-    m_variableBoxController.setTextInputCaller(textInput);
-    displayModalViewController(&m_variableBoxController, 0.f, 0.f, Metric::PopUpTopMargin, Metric::PopUpLeftMargin, 0, Metric::PopUpRightMargin);
-    return true;
-  }
   return false;
+}
+
+void App::initPythonWithUser(const void * pythonUser) {
+  if (!m_pythonUser) {
+    MicroPython::init(m_pythonHeap, m_pythonHeap + k_pythonHeapSize);
+  }
+  m_pythonUser = pythonUser;
+}
+
+void App::deinitPython() {
+  if (m_pythonUser) {
+    MicroPython::deinit();
+    m_pythonUser = nullptr;
+  }
 }
 
 }

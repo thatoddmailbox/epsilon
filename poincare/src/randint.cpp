@@ -1,6 +1,9 @@
 #include <poincare/randint.h>
+#include <poincare/complex.h>
 #include <poincare/random.h>
 #include <ion.h>
+#include <poincare/layout_helper.h>
+#include <poincare/serialization_helper.h>
 
 extern "C" {
 #include <assert.h>
@@ -9,28 +12,29 @@ extern "C" {
 
 namespace Poincare {
 
-Expression::Type Randint::type() const {
-  return Type::Randint;
+constexpr Expression::FunctionHelper Randint::s_functionHelper;
+
+int RandintNode::numberOfChildren() const { return Randint::s_functionHelper.numberOfChildren(); }
+
+Layout RandintNode::createLayout(Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const {
+  return LayoutHelper::Prefix(Randint(this), floatDisplayMode, numberOfSignificantDigits, Randint::s_functionHelper.name());
 }
 
-Expression * Randint::clone() const {
-  Randint * a = new Randint(m_operands, true);
-  return a;
+int RandintNode::serialize(char * buffer, int bufferSize, Preferences::PrintFloatMode floatDisplayMode, int numberOfSignificantDigits) const {
+  return SerializationHelper::Prefix(this, buffer, bufferSize, floatDisplayMode, numberOfSignificantDigits, Randint::s_functionHelper.name());
 }
 
-template <typename T> Evaluation<T> * Randint::templateApproximate(Context & context, AngleUnit angleUnit) const {
-  Evaluation<T> * aInput = operand(0)->privateApproximate(T(), context, angleUnit);
-  Evaluation<T> * bInput = operand(1)->privateApproximate(T(), context, angleUnit);
-  T a = aInput->toScalar();
-  T b = bInput->toScalar();
-  delete aInput;
-  delete bInput;
+template <typename T> Evaluation<T> RandintNode::templateApproximate(Context & context, Preferences::AngleUnit angleUnit) const {
+  Evaluation<T> aInput = childAtIndex(0)->approximate(T(), context, angleUnit);
+  Evaluation<T> bInput = childAtIndex(1)->approximate(T(), context, angleUnit);
+  T a = aInput.toScalar();
+  T b = bInput.toScalar();
   if (std::isnan(a) || std::isnan(b) || a != std::round(a) || b != std::round(b) || a > b) {
-    return new Complex<T>(Complex<T>::Undefined());
+    return Complex<T>::Undefined();
 
   }
   T result = std::floor(Random::random<T>()*(b+1.0-a)+a);
-  return new Complex<T>(result);
+  return Complex<T>(result);
 }
 
 }

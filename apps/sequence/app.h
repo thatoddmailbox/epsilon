@@ -2,7 +2,6 @@
 #define SEQUENCE_APP_H
 
 #include <escher.h>
-#include <poincare.h>
 #include "sequence_context.h"
 #include "sequence_store.h"
 #include "graph/graph_controller.h"
@@ -27,8 +26,8 @@ public:
     App * unpack(Container * container) override;
     void reset() override;
     Descriptor * descriptor() override;
-    SequenceStore * sequenceStore();
-    CurveViewRange * graphRange();
+    SequenceStore * sequenceStore() { return &m_sequenceStore; }
+    CurveViewRange * graphRange() { return &m_graphRange; }
   private:
     void tidy() override;
     SequenceStore m_sequenceStore;
@@ -36,7 +35,7 @@ public:
   };
   InputViewController * inputViewController() override;
   SequenceContext * localContext() override;
-  const char * XNT() override;
+  char XNT() override;
 private:
   App(Container * container, Snapshot * snapshot);
   SequenceContext m_sequenceContext;

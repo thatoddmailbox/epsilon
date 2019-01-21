@@ -2,6 +2,15 @@
 #define REGRESSION_STORE_H
 
 #include "model/model.h"
+#include "model/cubic_model.h"
+#include "model/exponential_model.h"
+#include "model/linear_model.h"
+#include "model/logarithmic_model.h"
+#include "model/logistic_model.h"
+#include "model/power_model.h"
+#include "model/quadratic_model.h"
+#include "model/quartic_model.h"
+#include "model/trigonometric_model.h"
 #include "../shared/interactive_curve_view_range.h"
 #include "../shared/double_pair_store.h"
 #include <escher/responder.h>
@@ -12,11 +21,9 @@ namespace Regression {
 class Store : public Shared::InteractiveCurveViewRange, public Shared::DoublePairStore {
 public:
   Store();
-  ~Store();
-  Store(const Store & other) = delete;
-  Store(Store && other) = delete;
-  Store& operator=(const Store & other) = delete;
-  Store& operator=(Store && other) = delete;
+
+  // Clean pool
+  void tidy();
 
   // Regression
   void setSeriesRegressionType(int series, Model::Type type);
@@ -26,11 +33,9 @@ public:
   Model * modelForSeries(int series) {
     assert(series >= 0 && series < k_numberOfSeries);
     assert((int)m_regressionTypes[series] >= 0 && (int)m_regressionTypes[series] < Model::k_numberOfModels);
-    return m_regressionModels[(int)m_regressionTypes[series]];
+    return regressionModel((int)m_regressionTypes[series]);
   }
-  /* Return the series index of the closest regression at abscissa x, above
-   * ordinate y if direction > 0, below otherwise */
-  int closestVerticalRegression(int direction, double x, double y, int currentRegressionSeries, Poincare::Context * globalContext);
+
   // Dots
   /* Return the closest dot to abscissa x above the regression curve if
    * direction > 0, below otherwise */
@@ -39,7 +44,7 @@ public:
    * on the left otherwise */
   int nextDot(int series, int direction, int dot);
   Model * regressionModel(Model::Type type) {
-    return m_regressionModels[(int) type];
+    return regressionModel((int) type);
   }
 
   // Window
@@ -67,12 +72,21 @@ private:
   constexpr static float k_displayHorizontalMarginRatio = 0.05f;
   float maxValueOfColumn(int series, int i) const;
   float minValueOfColumn(int series, int i) const;
+  Model * regressionModel(int index);
   uint32_t m_seriesChecksum[k_numberOfSeries];
   Model::Type m_regressionTypes[k_numberOfSeries];
-  Model * m_regressionModels[Model::k_numberOfModels];
+  LinearModel m_linearModel;
+  QuadraticModel m_quadraticModel;
+  CubicModel m_cubicModel;
+  QuarticModel m_quarticModel;
+  LogarithmicModel m_logarithmicModel;
+  ExponentialModel m_exponentialModel;
+  PowerModel m_powerModel;
+  TrigonometricModel m_trigonometricModel;
+  LogisticModel m_logisticModel;
   double m_regressionCoefficients[k_numberOfSeries][Model::k_maxNumberOfCoefficients];
   bool m_regressionChanged[k_numberOfSeries];
-  Poincare::Expression::AngleUnit m_angleUnit;
+  Poincare::Preferences::AngleUnit m_angleUnit;
 };
 
 typedef double (Store::*ArgCalculPointer)(int, int) const;

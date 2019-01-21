@@ -50,24 +50,28 @@ ExamPopUpController::ContentView::ContentView(Responder * parentResponder) :
     ExamPopUpController * controller = (ExamPopUpController *)context;
     Container * container = (Container *)controller->app()->container();
     container->activeApp()->dismissModalViewController();
-  }, parentResponder), KDText::FontSize::Small),
+    return true;
+  }, parentResponder), KDFont::SmallFont),
   m_okButton(parentResponder, I18n::Message::Ok, Invocation([](void * context, void * sender) {
     ExamPopUpController * controller = (ExamPopUpController *)context;
-    GlobalPreferences::ExamMode nextExamMode = controller->isActivatingExamMode() ? GlobalPreferences::ExamMode::Activate : GlobalPreferences::ExamMode::Desactivate;
+    GlobalPreferences::ExamMode nextExamMode = controller->isActivatingExamMode() ? GlobalPreferences::ExamMode::Activate : GlobalPreferences::ExamMode::Deactivate;
     GlobalPreferences::sharedGlobalPreferences()->setExamMode(nextExamMode);
     AppsContainer * container = (AppsContainer *)controller->app()->container();
     if (controller->isActivatingExamMode()) {
       container->reset();
+      Ion::LED::setColor(KDColorRed);
+      Ion::LED::setBlinking(1000, 0.1f);
     } else {
       Ion::LED::setColor(KDColorBlack);
     }
     container->refreshPreferences();
     container->activeApp()->dismissModalViewController();
-  }, parentResponder), KDText::FontSize::Small),
-  m_warningTextView(KDText::FontSize::Small, I18n::Message::Warning, 0.5, 0.5, KDColorWhite, KDColorBlack),
-  m_messageTextView1(KDText::FontSize::Small, I18n::Message::Default, 0.5, 0.5, KDColorWhite, KDColorBlack),
-  m_messageTextView2(KDText::FontSize::Small, I18n::Message::Default, 0.5, 0.5, KDColorWhite, KDColorBlack),
-  m_messageTextView3(KDText::FontSize::Small, I18n::Message::Default, 0.5, 0.5, KDColorWhite, KDColorBlack)
+    return true;
+  }, parentResponder), KDFont::SmallFont),
+  m_warningTextView(KDFont::SmallFont, I18n::Message::Warning, 0.5, 0.5, KDColorWhite, KDColorBlack),
+  m_messageTextView1(KDFont::SmallFont, I18n::Message::Default, 0.5, 0.5, KDColorWhite, KDColorBlack),
+  m_messageTextView2(KDFont::SmallFont, I18n::Message::Default, 0.5, 0.5, KDColorWhite, KDColorBlack),
+  m_messageTextView3(KDFont::SmallFont, I18n::Message::Default, 0.5, 0.5, KDColorWhite, KDColorBlack)
 {
 }
 
@@ -131,7 +135,7 @@ View * ExamPopUpController::ContentView::subviewAtIndex(int index) {
 void ExamPopUpController::ContentView::layoutSubviews() {
   KDCoordinate height = bounds().height();
   KDCoordinate width = bounds().width();
-  KDCoordinate textHeight = KDText::charSize(KDText::FontSize::Small).height();
+  KDCoordinate textHeight = KDFont::SmallFont->glyphSize().height();
   m_warningTextView.setFrame(KDRect(0, k_topMargin, width, textHeight));
   m_messageTextView1.setFrame(KDRect(0, k_topMargin+k_paragraphHeight+textHeight, width, textHeight));
   m_messageTextView2.setFrame(KDRect(0, k_topMargin+k_paragraphHeight+2*textHeight, width, textHeight));

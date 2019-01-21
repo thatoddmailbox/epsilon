@@ -10,18 +10,16 @@
 #include "../shared/tab_table_controller.h"
 #include "../shared/separator_even_odd_buffer_text_cell.h"
 #include "../shared/store_cell.h"
+#include "../constant.h"
 
 namespace Regression {
 
-class CalculationController : public Shared::TabTableController, public TableViewDataSource, public SelectableTableViewDelegate, public ButtonRowDelegate, public AlternateEmptyViewDelegate  {
+constexpr static size_t max(KDCoordinate a, KDCoordinate b) { return a > b ? a : b; }
+
+class CalculationController : public Shared::TabTableController, public TableViewDataSource, public SelectableTableViewDelegate, public ButtonRowDelegate, public AlternateEmptyViewDefaultDelegate  {
 
 public:
   CalculationController(Responder * parentResponder, ButtonRowController * header, Store * store);
-  ~CalculationController();
-  CalculationController(const CalculationController& other) = delete;
-  CalculationController(CalculationController&& other) = delete;
-  CalculationController& operator=(const CalculationController& other) = delete;
-  CalculationController& operator=(CalculationController&& other) = delete;
 
   // View Controller
   const char * title() override;
@@ -33,7 +31,7 @@ public:
   // SelectableTableViewDelegate
   void tableViewDidChangeSelection(SelectableTableView * t, int previousSelectedCellX, int previousSelectedCellY) override;
 
-  // AlternateEmptyViewDelegate
+  // AlternateEmptyViewDefaultDelegate
   bool isEmpty() const override;
   I18n::Message emptyMessage() override;
   Responder * defaultController() override;
@@ -64,25 +62,26 @@ private:
   static constexpr int k_regressionCellIndex = 9;
 
   static constexpr KDCoordinate k_cellHeight = 25;
-  static constexpr KDCoordinate k_smallCalculationCellWidth = Ion::Display::Width/2 - Metric::CommonRightMargin/2 - Metric::CommonLeftMargin/2;
-  static constexpr KDCoordinate k_cubicCalculationCellWidth = 150;
-  static constexpr KDCoordinate k_quarticCalculationCellWidth = 195;
+  static constexpr KDCoordinate k_titleCalculationCellWidth = Ion::Display::Width/2 - Metric::CommonRightMargin/2 - Metric::CommonLeftMargin/2;
+  // TODO: change 7 for KDFont::SmallFont->glyphSize().width()
+  static constexpr KDCoordinate k_minCalculationCellWidth = 7*2*(Poincare::PrintFloat::bufferSizeForFloatsWithPrecision(Constant::LargeNumberOfSignificantDigits)); //Calculation width should at least be able to hold to numbers with LargeNumberOfSignificantDigits.
+  static constexpr KDCoordinate k_cubicCalculationCellWidth = max(150, k_minCalculationCellWidth); // Should hold aX^3+bX^2+cX+d
+  static constexpr KDCoordinate k_quarticCalculationCellWidth = max(195, k_minCalculationCellWidth ); // Should hold ? aX^4+bX^3+c*X^2+dX+e
   static constexpr KDCoordinate k_margin = 8;
   static constexpr KDCoordinate k_r2CellMargin = 2;
   static constexpr KDCoordinate k_scrollBarMargin = Metric::CommonRightMargin;
-
   Responder * tabController() const override;
-  View * loadView() override;
-  void unloadView(View * view) override;
+  SelectableTableView * selectableTableView() override { return &m_selectableTableView; }
   bool hasLinearRegression() const;
   int maxNumberOfCoefficients() const;
-  Shared::MarginEvenOddMessageTextCell * m_titleCells[k_maxNumberOfDisplayableRows];
-  EvenOddExpressionCell * m_r2TitleCell;
-  Poincare::ExpressionLayout * m_r2Layout;
-  ColumnTitleCell * m_columnTitleCells[Store::k_numberOfSeries];
-  EvenOddDoubleBufferTextCellWithSeparator * m_doubleCalculationCells[k_numberOfDoubleCalculationCells];
-  Shared::SeparatorEvenOddBufferTextCell * m_calculationCells[k_numberOfCalculationCells];
-  Shared::HideableEvenOddCell * m_hideableCell;
+  Poincare::Layout m_r2Layout;
+  SelectableTableView m_selectableTableView;
+  Shared::MarginEvenOddMessageTextCell m_titleCells[k_maxNumberOfDisplayableRows];
+  EvenOddExpressionCell m_r2TitleCell;
+  ColumnTitleCell m_columnTitleCells[Store::k_numberOfSeries];
+  EvenOddDoubleBufferTextCellWithSeparator m_doubleCalculationCells[k_numberOfDoubleCalculationCells];
+  Shared::SeparatorEvenOddBufferTextCell m_calculationCells[k_numberOfCalculationCells];
+  Shared::HideableEvenOddCell m_hideableCell;
   Store * m_store;
 };
 
